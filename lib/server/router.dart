@@ -1,12 +1,16 @@
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
-import 'dart:developer' as dev;
+
+import 'package:proxishare/logger.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:proxishare/server/error_handler.dart';
 
 Future<void> _serveHome(HttpRequest request) async {
   // TODO: built application like react?
-  final file = File("lib/server/index.html");
-  dev.log("file ${file.absolute}");
+  final file = File("webui/index.html");
+  // final file = File("lib/server/index.html");
+  logger.debug("file ${file.absolute}");
   if (!await file.exists()) {
     throw Error();
   }
@@ -36,13 +40,47 @@ Future<void> _serveTestFile(HttpRequest request) async {
       .whenComplete(() => request.response.close());
 }
 
+ContentType getContentType(String path) {
+  if (path.endsWith('.html')) return ContentType.html;
+  if (path.endsWith('.js')) return ContentType('application', 'javascript');
+  if (path.endsWith('.css')) return ContentType('text', 'css');
+  if (path.endsWith('.svg')) return ContentType('image', 'svg+xml');
+  if (path.endsWith('.json')) return ContentType.json;
+  return ContentType.binary;
+}
+
+Future<void> _serveWebui(HttpRequest request) async {
+  final subPath = request.uri.path.replaceFirst('/webui', '');
+  final filePath = 'assets/webui${subPath.isEmpty ? '/index.html' : subPath}';
+
+  logger.debug("_serveWebui Trying to load filePath $filePath");
+
+  try {
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw Error();
+    }
+
+    request.response.headers.contentType = getContentType(filePath);
+    await request.response.addStream(file.openRead());
+    await request.response.close();
+  } catch (e) {
+    logger.error("_serveWebui file $filePath gave error ${e.toString()}");
+    sendError(request, HttpStatus.notFound, 'File not found: $filePath');
+  }
+}
+
+typedef RouteHandler = Future<void> Function(HttpRequest request);
+
+typedef RoutesType = Map<String, RouteHandler>;
+
 class Router {
-  final routes = <String, Future<void> Function(HttpRequest)>{
+  final RoutesType routes = {
     '/': _serveHome,
     '/index.html': _serveHome,
     '/test.txt': _serveTestFile,
+    '/webui': _serveWebui,
   };
-
   void addRoute(String path, Future<void> Function(HttpRequest) handler) {
     routes[path] = handler;
   }

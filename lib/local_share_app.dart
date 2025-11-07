@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:pretty_qr_code/pretty_qr_code.dart';
@@ -26,16 +24,6 @@ class _LocalShareAppState extends State<LocalShareApp> {
   Future<void> _startServer() async {
     await _server.start();
     setState(() => _url = _server.url);
-
-    // registering dynamic routing. needed ?
-    _server.addRoute('/json', (HttpRequest req) async {
-      req.response
-        ..headers.contentType = ContentType.json
-        ..write(
-          jsonEncode({'hello': 'world', 'time': DateTime.now().toString()}),
-        )
-        ..close();
-    });
   }
 
   @override
@@ -62,8 +50,8 @@ class _LocalShareAppState extends State<LocalShareApp> {
               background: Colors.transparent,
               shape: PrettyQrShape.custom(
                 PrettyQrSquaresSymbol(
-                  color: Colors.red,
-                  // color: Colors.white,
+                  // color: Colors.red,
+                  color: Colors.white,
                 ),
               ),
               image: PrettyQrDecorationImage(

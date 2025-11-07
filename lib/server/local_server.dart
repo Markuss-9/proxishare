@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:developer' as dev;
 import 'dart:io';
 import 'package:network_info_plus/network_info_plus.dart';
+import 'package:proxishare/logger.dart';
 import 'package:proxishare/server/error_handler.dart';
 
 import 'package:proxishare/server/router.dart';
@@ -17,41 +17,56 @@ class LocalServer {
   Router router = Router();
 
   Future<void> start() async {
-    dev.log('Starting local server...');
+    logger.info('Starting local server...');
 
     ipAddress = await _getBestIPAddress();
-    dev.log('Server IP: $ipAddress');
+    logger.info('Server IP: $ipAddress');
 
     _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
 
     url = "http://$ipAddress:$port";
-    dev.log('Server running on $url');
+    logger.info('Server running on $url');
 
     _server!.listen(_handleRequest);
   }
 
   Future<void> stop() async {
     await _server?.close(force: true);
-    dev.log('Server stopped.');
+    logger.info('Server stopped.');
   }
 
   Future<void> _handleRequest(HttpRequest request) async {
-    dev.log('Request: ${request.method} ${request.uri.path}');
-    final handler = router.routes[request.uri.path];
+    logger.trace('Request: ${request.method} ${request.uri.path}');
+
+    var handler = router.routes[request.uri.path];
+
+    // If no exact match, check for prefix-based route
+    if (handler == null) {
+      for (var entry in router.routes.entries) {
+        final check = request.uri.path.startsWith("${entry.key}/");
+        logger.debug(
+          "searching for request ${request.uri.path} if matching entry ${entry.key}/   $check",
+        );
+        if (request.uri.path.startsWith("${entry.key}/")) {
+          logger.debug("found ${entry.key}");
+          handler = entry.value;
+          break;
+        }
+      }
+    }
 
     if (handler != null) {
       try {
         await handler(request);
       } on Error catch (e, st) {
-        // TODO: better handling of errors, depending from api json vs html
-        dev.log('REAL Error handling ${request.uri.path}: $e\n$st');
+        logger.error('REAL Error handling ${request.uri.path}: $e\n$st');
         sendJsonError(request, HttpStatus.internalServerError, e);
       } catch (e, st) {
-        dev.log('Error handling ${request.uri.path}: $e\n$st');
+        logger.error('Error handling ${request.uri.path}: $e\n$st');
         sendError(request, HttpStatus.notFound, 'Route not found');
       }
     } else {
-      dev.log("Route ${request.uri.path} not found");
+      logger.error("Route ${request.uri.path} not found");
       sendError(request, HttpStatus.notFound, 'Route not found');
     }
   }
@@ -64,7 +79,7 @@ class LocalServer {
       final ip = await info.getWifiIP();
       if (ip != null && ip.isNotEmpty) return ip;
     } catch (e) {
-      dev.log('NetworkInfoPlus not available: $e');
+      logger.error('NetworkInfoPlus not available: $e');
     }
     return await _getLocalIp();
   }

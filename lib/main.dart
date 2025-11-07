@@ -18,7 +18,7 @@ class App extends StatelessWidget {
       darkTheme: darkTheme,
       themeMode: ThemeMode.system,
       home: Scaffold(
-        appBar: AppBar(title: const Text('LocalShare')),
+        appBar: AppBar(title: const Center(child: Text('ProxiShare'))),
         body: Center(child: LocalShareApp()),
       ),
     );
