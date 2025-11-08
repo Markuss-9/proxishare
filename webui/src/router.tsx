@@ -1,23 +1,23 @@
-import { createBrowserRouter } from "react-router";
-import { RouterProvider } from "react-router/dom";
-import Homepage from "./pages/homepage.tsx";
-import { isRouteErrorResponse, useRouteError } from "react-router";
+import { createBrowserRouter } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
+import Homepage from './pages/homepage.tsx';
+import { isRouteErrorResponse, useRouteError } from 'react-router';
 
 const router = createBrowserRouter(
   [
     {
-      path: "/",
+      path: '/',
       children: [
-        { index: true, path: "", element: <Homepage /> },
-        { path: "other", element: <Other /> },
-        { path: "*", element: <NotFound /> },
+        { index: true, path: '', element: <Homepage /> },
+        { path: 'other', element: <Other /> },
+        { path: '*', element: <NotFound /> },
       ],
       ErrorBoundary,
     },
   ],
   {
-    basename: "webui",
-  },
+    basename: 'webui',
+  }
 );
 
 function Other() {
@@ -55,6 +55,6 @@ export function ErrorBoundary() {
 }
 
 export default function Router() {
-  console.log("router");
+  console.log('router');
   return <RouterProvider router={router} />;
 }

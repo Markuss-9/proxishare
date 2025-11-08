@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { useMediaStore } from "../store.ts";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { LocalServer } from "@/client.ts";
+import { useState } from 'react';
+import { useMediaStore } from '../store.ts';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { LocalServer } from '@/client.ts';
 
 export default function Homepage() {
   const { file, setFile, uploading, setUploading } = useMediaStore();
@@ -19,11 +19,11 @@ export default function Homepage() {
     if (!file) return;
     setUploading(true);
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append('file', file);
 
     try {
-      const res = await LocalServer.post("/upload", formData);
-      console.log("handleShare completed", res);
+      const res = await LocalServer.post('/upload', formData);
+      console.log('handleShare completed', res);
 
       setProgress(100);
     } catch (error) {
