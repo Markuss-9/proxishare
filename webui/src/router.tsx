@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import Homepage from './pages/homepage.tsx';
+import Homepage from '@/pages/Homepage';
 import { isRouteErrorResponse, useRouteError } from 'react-router';
 
 const router = createBrowserRouter(

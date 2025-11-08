@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useMediaStore } from '../store.ts';
+import { useMediaStore } from '@/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { LocalServer } from '@/client.ts';
+import { LocalServer } from '@/client';
 
 export default function Homepage() {
   const { file, setFile, uploading, setUploading } = useMediaStore();
@@ -44,7 +44,15 @@ export default function Homepage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <input type="file" accept="image/*,video/*" onChange={handleSelect} />
+          <label htmlFor="file-input" className="sr-only">
+            Select file
+          </label>
+          <input
+            id="file-input"
+            type="file"
+            accept="image/*,video/*"
+            onChange={handleSelect}
+          />
           {file && <p className="text-sm text-gray-500">{file.name}</p>}
 
           {uploading ? (
