@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:proxishare/logger.dart';
 import 'package:proxishare/server/error_handler.dart';
+import 'package:proxishare/server/middlewares.dart';
 
 import 'package:proxishare/server/router.dart';
 
@@ -37,6 +38,7 @@ class LocalServer {
 
   Future<void> _handleRequest(HttpRequest request) async {
     logger.trace('Request: ${request.method} ${request.uri.path}');
+    handleCors(request);
 
     var handler = router.routes[request.uri.path];
 

@@ -3,8 +3,9 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:proxishare/logger.dart';
-import 'package:flutter/services.dart' show rootBundle;
+// import 'package:flutter/services.dart' show rootBundle;
 import 'package:proxishare/server/error_handler.dart';
+import 'package:proxishare/server/upload.dart';
 
 Future<void> _serveHome(HttpRequest request) async {
   // TODO: built application like react?
@@ -38,6 +39,11 @@ Future<void> _serveTestFile(HttpRequest request) async {
   await request.response
       .addStream(file.openRead())
       .whenComplete(() => request.response.close());
+}
+
+Future<void> _serveUpload(HttpRequest request) async {
+  final path = await _localPath;
+  handleFileUpload(request, "$path/ProxiShare");
 }
 
 ContentType getContentType(String path) {
@@ -79,6 +85,7 @@ class Router {
     '/': _serveHome,
     '/index.html': _serveHome,
     '/test.txt': _serveTestFile,
+    '/upload': _serveUpload,
     '/webui': _serveWebui,
   };
   void addRoute(String path, Future<void> Function(HttpRequest) handler) {
