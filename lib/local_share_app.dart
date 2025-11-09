@@ -8,34 +8,34 @@ import 'package:proxishare/server/local_server.dart';
 class LocalShareApp extends StatefulWidget {
   const LocalShareApp({super.key});
   @override
-  State<LocalShareApp> createState() => _LocalShareAppState();
+  State<LocalShareApp> createState() => LocalShareAppState();
 }
 
-class _LocalShareAppState extends State<LocalShareApp> {
-  LocalServer? _server;
+class LocalShareAppState extends State<LocalShareApp> {
+  LocalServer? server;
 
   @override
   void initState() {
     super.initState();
   }
 
-  Future<void> _startServer({int? port}) async {
-    LocalServer server = LocalServer(port: port);
-    await server.start();
+  Future<void> startServer({int? port}) async {
+    LocalServer s = LocalServer(port: port);
+    await s.start();
     setState(() {
-      _server = server;
+      server = s;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_server == null) {
+    if (server == null) {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           TextButton(
-            onPressed: () {
-              _startServer();
+            onPressed: () async {
+              startServer();
             },
             child: Text("Start the server"),
           ),
@@ -43,13 +43,13 @@ class _LocalShareAppState extends State<LocalShareApp> {
       );
     }
 
-    final LocalServer server = _server!;
+    final LocalServer s = server!;
 
-    if (server.loading) {
+    if (s.loading) {
       return CircularProgressIndicator();
     }
 
-    final url = server.url!;
+    final url = s.url!;
     final webuiURL = "$url/webui";
 
     return Column(
@@ -87,9 +87,9 @@ class _LocalShareAppState extends State<LocalShareApp> {
         const SizedBox(height: 50),
         TextButton(
           onPressed: () {
-            _server?.stop();
+            server?.stop();
             setState(() {
-              _server = null;
+              server = null;
             });
           },
           child: Text("Stop the server"),
@@ -100,7 +100,7 @@ class _LocalShareAppState extends State<LocalShareApp> {
 
   @override
   void dispose() {
-    _server?.stop();
+    server?.stop();
     super.dispose();
   }
 }

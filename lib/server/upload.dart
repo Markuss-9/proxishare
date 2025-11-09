@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:mime/mime.dart';
+import 'package:proxishare/logger.dart';
 
 /// Handles a single HTTP request containing multipart/form-data (file upload)
 /// and saves uploaded files to [saveDirectory].
@@ -58,11 +59,11 @@ Future<List<String>> handleFileUpload(
       final file = File('${directory.path}/$filename');
       await file.writeAsBytes(fileBytes);
       savedFiles.add(file.path);
-      print('✅ File saved: ${file.path} (${fileBytes.length} bytes)');
+      logger.debug('✅ File saved: ${file.path} (${fileBytes.length} bytes)');
     } else {
       // Non-file form field (optional)
       final fieldContent = await utf8.decoder.bind(part).join();
-      print('Field content: $fieldContent');
+      logger.debug('Field content: $fieldContent');
     }
   }
 
