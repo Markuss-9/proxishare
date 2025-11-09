@@ -41,7 +41,7 @@ class LocalServer {
 
   Future<void> _handleRequest(HttpRequest request) async {
     logger.trace('Request: ${request.method} ${request.uri.path}');
-    handleCors(request);
+    Middlewares.handleCors(request);
 
     var handler = router.routes[request.uri.path];
 

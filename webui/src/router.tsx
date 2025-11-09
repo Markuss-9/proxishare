@@ -55,6 +55,5 @@ export function ErrorBoundary() {
 }
 
 export default function Router() {
-  console.log('router');
   return <RouterProvider router={router} />;
 }

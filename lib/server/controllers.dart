@@ -5,6 +5,7 @@ import 'package:mime/mime.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:proxishare/logger.dart';
 import 'package:proxishare/server/error_handler.dart';
+import 'package:proxishare/server/middlewares.dart';
 import 'package:proxishare/server/upload.dart';
 
 Future<String> get _localPath async {
@@ -31,7 +32,8 @@ Future<void> serveUpload(HttpRequest request) async {
 
 Future<void> serveWebui(HttpRequest request) async {
   final subPath = request.uri.path.replaceFirst('/webui', '');
-  final assetPath = 'assets/webui${subPath.isEmpty ? '/index.html' : subPath}';
+  final isIndex = subPath.isEmpty;
+  final assetPath = 'assets/webui${isIndex ? '/index.html' : subPath}';
 
   logger.debug("_serveWebui Trying to load assetPath $assetPath");
 
@@ -43,7 +45,12 @@ Future<void> serveWebui(HttpRequest request) async {
 
     // Guess MIME type from file extension
     final mimeType = lookupMimeType(assetPath) ?? 'application/octet-stream';
+    logger.debug("serveWebui mimeType $mimeType");
     request.response.headers.contentType = ContentType.parse(mimeType);
+    if (!isIndex) {
+      // 1 month, files are hashed
+      Middlewares.addCacheControl(request, maxAge: 30 * 24 * 60 * 60);
+    }
 
     // Write response
     request.response.add(data);

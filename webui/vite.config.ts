@@ -16,6 +16,7 @@ export default defineConfig({
   build: {
     outDir: '../assets/webui',
     emptyOutDir: true,
+    assetsDir: '',
     // watch: {},
   },
   // NOTE: so the html requires js, css etc... from subpath /webui . this path is the one declared in flutter local server
