@@ -8,7 +8,6 @@ import 'package:proxishare/server/error_handler.dart';
 import 'package:proxishare/server/upload.dart';
 
 Future<void> _serveHome(HttpRequest request) async {
-  // TODO: built application like react?
   final file = File("webui/index.html");
   // final file = File("lib/server/index.html");
   logger.debug("file ${file.absolute}");
@@ -31,7 +30,7 @@ Future<String> get _localPath async {
 Future<void> _serveTestFile(HttpRequest request) async {
   final path = await _localPath;
   // NOTE: attention this is created on ~/Documents directory
-  final file = File('$path/test.txt');
+  final file = File('$path/ProxiShare/test.txt');
   if (!await file.exists()) {
     await file.writeAsString('Hello from Flutter local server!');
   }

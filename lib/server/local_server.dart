@@ -8,12 +8,13 @@ import 'package:proxishare/server/middlewares.dart';
 import 'package:proxishare/server/router.dart';
 
 class LocalServer {
-  final int port;
+  int? port;
   HttpServer? _server;
   String? ipAddress;
   String? url;
+  bool loading = true;
 
-  LocalServer({required this.port});
+  LocalServer({this.port});
 
   Router router = Router();
 
@@ -23,12 +24,14 @@ class LocalServer {
     ipAddress = await _getBestIPAddress();
     logger.info('Server IP: $ipAddress');
 
-    _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+    _server = await HttpServer.bind(InternetAddress.anyIPv4, port ?? 0);
+    port = _server!.port;
 
     url = "http://$ipAddress:$port";
     logger.info('Server running on $url');
 
     _server!.listen(_handleRequest);
+    loading = false;
   }
 
   Future<void> stop() async {
