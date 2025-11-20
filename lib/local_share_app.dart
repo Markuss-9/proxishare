@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:proxishare/components/toast.dart';
 import 'package:proxishare/server/local_server.dart';
+import 'package:proxishare/logger.dart';
 
 class LocalShareApp extends StatefulWidget {
   const LocalShareApp({super.key});
@@ -20,11 +21,18 @@ class LocalShareAppState extends State<LocalShareApp> {
   }
 
   Future<void> startServer({int? port}) async {
-    LocalServer s = LocalServer(port: port);
-    await s.start();
-    setState(() {
-      server = s;
-    });
+    try {
+      LocalServer s = LocalServer(port: port);
+
+      await s.getBestIPAddress();
+
+      await s.start();
+      setState(() {
+        server = s;
+      });
+    } catch (e, st) {
+      logger.error('Failed to start server: $e', error: e, stackTrace: st);
+    }
   }
 
   @override
@@ -38,6 +46,20 @@ class LocalShareAppState extends State<LocalShareApp> {
               startServer();
             },
             child: Text("Start the server"),
+          ),
+          TextButton(
+            onPressed: () async {
+              final path = await LogService.exportLogs();
+              if (path != null) {
+                showToast(context, 'Logs exported to:\n$path');
+              } else {
+                showToast(
+                  context,
+                  'Failed to export logs. Check storage permissions.',
+                );
+              }
+            },
+            child: Text('Export logs'),
           ),
         ],
       );
@@ -93,6 +115,20 @@ class LocalShareAppState extends State<LocalShareApp> {
             });
           },
           child: Text("Stop the server"),
+        ),
+        TextButton(
+          onPressed: () async {
+            final path = await LogService.exportLogs();
+            if (path != null) {
+              showToast(context, 'Logs exported to:\n$path');
+            } else {
+              showToast(
+                context,
+                'Failed to export logs. Check storage permissions.',
+              );
+            }
+          },
+          child: Text('Export logs'),
         ),
       ],
     );

@@ -21,7 +21,7 @@ class LocalServer {
   Future<void> start() async {
     logger.info('Starting local server...');
 
-    ipAddress = await _getBestIPAddress();
+    ipAddress = await getBestIPAddress();
     logger.info('Server IP: $ipAddress');
 
     _server = await HttpServer.bind(InternetAddress.anyIPv4, port ?? 0);
@@ -78,27 +78,81 @@ class LocalServer {
 
   /// ========== Utilities ==========
 
-  Future<String?> _getBestIPAddress() async {
+  Future<String> getBestIPAddress() async {
+    String? ip;
+
     try {
       final info = NetworkInfo();
-      final ip = await info.getWifiIP();
-      if (ip != null && ip.isNotEmpty) return ip;
-    } catch (e) {
-      logger.error('NetworkInfoPlus not available: $e');
+      ip = await info.getWifiIP();
+      logger.debug('NetworkInfoPlus returned WiFi IP: $ip');
+    } catch (e, st) {
+      logger.error('NetworkInfoPlus failed: $e\n$st');
     }
-    return await _getLocalIp();
+
+    ip ??= await _getLocalIp();
+
+    ip ??= '127.0.0.1';
+
+    // if (_isAndroidEmulator(ip)) {
+    //   logger.debug(
+    //     'Detected Android Emulator IP: $ip — remapping to 10.0.2.2 (host)',
+    //   );
+    //   return '10.0.2.2';
+    // }
+
+    // if (_isiOSSimulator(ip)) {
+    //   logger.debug(
+    //     'Detected iOS Simulator IP: $ip — remapping to 127.0.0.1 (host)',
+    //   );
+    //   return '127.0.0.1';
+    // }
+
+    return ip;
   }
 
   Future<String?> _getLocalIp() async {
-    final interfaces = await NetworkInterface.list(
-      includeLoopback: false,
-      type: InternetAddressType.IPv4,
-    );
-    for (final interface in interfaces) {
-      for (final addr in interface.addresses) {
-        return addr.address;
+    try {
+      final interfaces = await NetworkInterface.list(
+        includeLoopback: false,
+        type: InternetAddressType.IPv4,
+      );
+
+      logger.debug(
+        'Found network interfaces: ${interfaces.map((e) => e.name).join(', ')}',
+      );
+
+      for (final interface in interfaces) {
+        // Skip virtual or docker interfaces
+        if (interface.name.startsWith('docker') ||
+            interface.name.startsWith('veth') ||
+            interface.name.startsWith('br-')) {
+          continue;
+        }
+
+        for (final addr in interface.addresses) {
+          final address = addr.address;
+          // Skip link-local
+          if (address.startsWith('169.254.')) continue;
+          // Only take 192.168.x.x (your home network)
+          if (address.startsWith('192.168.')) return address;
+          // Optional: include 10.x.x.x if you know the subnet is reachable
+        }
       }
+
+      throw Exception('No suitable local IP found');
+    } catch (e, st) {
+      logger.error('Failed to get local IP: $e\n$st');
     }
-    return '127.0.0.1';
+    return null;
+  }
+
+  bool _isAndroidEmulator(String ip) {
+    // Android emulators use 10.0.2.x (default) or 10.0.3.x (Genymotion)
+    return ip.startsWith('10.0.2.') || ip.startsWith('10.0.3.');
+  }
+
+  bool _isiOSSimulator(String ip) {
+    // iOS simulator often uses 127.0.0.1 or 0.0.0.0
+    return ip == '127.0.0.1' || ip == '0.0.0.0';
   }
 }

@@ -43,6 +43,7 @@ Future<void> serveWebui(HttpRequest request) async {
         .load(assetPath)
         .then((bd) => bd.buffer.asUint8List());
 
+    logger.debug("serveWebui lookupMimeType for assetPath $assetPath");
     // Guess MIME type from file extension
     final mimeType = lookupMimeType(assetPath) ?? 'application/octet-stream';
     logger.debug("serveWebui mimeType $mimeType");
