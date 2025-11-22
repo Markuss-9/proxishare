@@ -1,0 +1,69 @@
+name: Build Apk
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: latest
+
+      - name: Install nodejs dependencies for webui
+        run: make install-webui
+
+      - name: Test webui
+        run: make test-webui
+
+      - name: Build webui
+        run: make build-webui
+
+      - name: Check webui build is in assets/webui
+        run: make check-build-webui
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          mkdir -p $HOME/Android/cmdline-tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip -d $HOME/Android/cmdline-tools
+          export ANDROID_HOME=$HOME/Android
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/cmdline-tools/bin:$PATH
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+          echo "ANDROID_HOME=$HOME/Android" >> $GITHUB_ENV
+          echo "$HOME/Android/platform-tools" >> $GITHUB_PATH
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install + Test + Build  flutter application
+        run: |
+          make install-flutter
+          make test
+          flutter build apk
+
+      - name: Upload build artifact
+        if: env.ACT != 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: apk-build
+          path: build/app/outputs/flutter-apk/app-release.apk
