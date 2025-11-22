@@ -3,6 +3,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:mime/mime.dart';
 import 'package:proxishare/logger.dart';
+import 'package:gal/gal.dart';
+import 'package:file_picker/file_picker.dart';
 
 /// Handles a single HTTP request containing multipart/form-data (file upload)
 /// and saves uploaded files to [saveDirectory].
@@ -56,10 +58,60 @@ Future<List<String>> handleFileUpload(
         return prev;
       });
 
-      final file = File('${directory.path}/$filename');
-      await file.writeAsBytes(fileBytes);
-      savedFiles.add(file.path);
-      logger.debug('✅ File saved: ${file.path} (${fileBytes.length} bytes)');
+      // Determine mime type
+      final mimeType = lookupMimeType(filename, headerBytes: fileBytes) ?? '';
+
+      // If image or video -> try saving to gallery using `gal`
+      var savedToGallery = false;
+      if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) {
+        try {
+          // Write to a temporary file because Gal APIs expect a file path
+          final tmp = File('${Directory.systemTemp.path}/$filename');
+          await tmp.writeAsBytes(fileBytes);
+
+          if (mimeType.startsWith('image/')) {
+            await Gal.putImage(tmp.path);
+          } else {
+            await Gal.putVideo(tmp.path);
+          }
+
+          savedFiles.add('gallery:$filename');
+          savedToGallery = true;
+          logger.debug('✅ Saved to gallery: $filename');
+
+          // Cleanup temp file
+          try {
+            if (await tmp.exists()) await tmp.delete();
+          } catch (_) {}
+        } on GalException catch (e) {
+          logger.debug('Gal error saving $filename: ${e.type}');
+        } catch (e) {
+          logger.debug('Unexpected error saving to gallery: $e');
+        }
+      }
+
+      if (!savedToGallery) {
+        // Let the user pick a folder on platforms that support it (desktop and mobile via SAF)
+        String? targetDirPath;
+
+        try {
+          targetDirPath = await FilePicker.platform.getDirectoryPath();
+        } catch (e) {
+          logger.debug('Directory picker failed: $e');
+        }
+
+        // If user cancelled or picker not available, use provided saveDirectory
+        final destDirPath = targetDirPath ?? directory.path;
+        final destDir = Directory(destDirPath);
+        if (!await destDir.exists()) {
+          await destDir.create(recursive: true);
+        }
+
+        final file = File('${destDir.path}/$filename');
+        await file.writeAsBytes(fileBytes);
+        savedFiles.add(file.path);
+        logger.debug('✅ File saved: ${file.path} (${fileBytes.length} bytes)');
+      }
     } else {
       // Non-file form field (optional)
       final fieldContent = await utf8.decoder.bind(part).join();
