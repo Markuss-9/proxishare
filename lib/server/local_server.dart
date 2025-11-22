@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:proxishare/logger.dart';
+import 'package:proxishare/server/events.dart';
 import 'package:proxishare/server/error_handler.dart';
 import 'package:proxishare/server/middlewares.dart';
 
@@ -13,13 +14,20 @@ class LocalServer {
   String? ipAddress;
   String? url;
   bool loading = true;
+  final _events = StreamController<ServerEvent>.broadcast();
+  static LocalServer? current;
 
   LocalServer({this.port});
+
+  Stream<ServerEvent> get events => _events.stream;
 
   Router router = Router();
 
   Future<void> start() async {
     logger.info('Starting local server...');
+
+    // register singleton so controllers can notify
+    LocalServer.current = this;
 
     ipAddress = await getBestIPAddress();
     logger.info('Server IP: $ipAddress');
@@ -34,9 +42,21 @@ class LocalServer {
     loading = false;
   }
 
+  void notifyEvent(ServerEvent event) {
+    try {
+      _events.add(event);
+    } catch (e, st) {
+      logger.error('Failed to notify event: $e\n$st');
+    }
+  }
+
   Future<void> stop() async {
     await _server?.close(force: true);
     logger.info('Server stopped.');
+    try {
+      LocalServer.current = null;
+      await _events.close();
+    } catch (_) {}
   }
 
   Future<void> _handleRequest(HttpRequest request) async {

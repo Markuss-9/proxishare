@@ -3,17 +3,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:mime/mime.dart';
 import 'package:proxishare/logger.dart';
-import 'package:gal/gal.dart';
-import 'package:file_picker/file_picker.dart';
 
 /// Handles a single HTTP request containing multipart/form-data (file upload)
 /// and saves uploaded files to [saveDirectory].
-/// Returns a list of saved file paths.
-Future<List<String>> handleFileUpload(
+/// Returns a list of maps with keys: `filename`, `path`, `mime`, `size`
+Future<List<Map<String, dynamic>>> handleFileUpload(
   HttpRequest request,
   String saveDirectory,
 ) async {
-  final savedFiles = <String>[];
+  final savedFiles = <Map<String, dynamic>>[];
 
   // Only POST requests with multipart/form-data
   if (request.method != 'POST' ||
@@ -25,7 +23,6 @@ Future<List<String>> handleFileUpload(
     return savedFiles;
   }
 
-  // Get boundary from Content-Type header
   final boundary = request.headers.contentType?.parameters['boundary'];
   if (boundary == null) {
     request.response
@@ -35,11 +32,9 @@ Future<List<String>> handleFileUpload(
     return savedFiles;
   }
 
-  // Create directory if it doesn't exist
-  final directory = Directory(saveDirectory);
-  if (!await directory.exists()) {
-    await directory.create(recursive: true);
-  }
+  // ensure temp dir exists
+  final tmpBase = Directory('${Directory.systemTemp.path}/proxishare_uploads');
+  if (!await tmpBase.exists()) await tmpBase.create(recursive: true);
 
   // Parse multipart parts
   final transformer = MimeMultipartTransformer(boundary);
@@ -58,62 +53,25 @@ Future<List<String>> handleFileUpload(
         return prev;
       });
 
-      // Determine mime type
       final mimeType = lookupMimeType(filename, headerBytes: fileBytes) ?? '';
 
-      // If image or video -> try saving to gallery using `gal`
-      var savedToGallery = false;
-      if (mimeType.startsWith('image/') || mimeType.startsWith('video/')) {
-        try {
-          // Write to a temporary file because Gal APIs expect a file path
-          final tmp = File('${Directory.systemTemp.path}/$filename');
-          await tmp.writeAsBytes(fileBytes);
+      // write to temp file
+      final safeName = filename.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final tmpFile = File('${tmpBase.path}/$safeName');
+      await tmpFile.writeAsBytes(fileBytes, flush: true);
 
-          if (mimeType.startsWith('image/')) {
-            await Gal.putImage(tmp.path);
-          } else {
-            await Gal.putVideo(tmp.path);
-          }
+      final meta = <String, dynamic>{
+        'filename': filename,
+        'path': tmpFile.path,
+        'mime': mimeType,
+        'size': await tmpFile.length(),
+      };
 
-          savedFiles.add('gallery:$filename');
-          savedToGallery = true;
-          logger.debug('✅ Saved to gallery: $filename');
-
-          // Cleanup temp file
-          try {
-            if (await tmp.exists()) await tmp.delete();
-          } catch (_) {}
-        } on GalException catch (e) {
-          logger.debug('Gal error saving $filename: ${e.type}');
-        } catch (e) {
-          logger.debug('Unexpected error saving to gallery: $e');
-        }
-      }
-
-      if (!savedToGallery) {
-        // Let the user pick a folder on platforms that support it (desktop and mobile via SAF)
-        String? targetDirPath;
-
-        try {
-          targetDirPath = await FilePicker.platform.getDirectoryPath();
-        } catch (e) {
-          logger.debug('Directory picker failed: $e');
-        }
-
-        // If user cancelled or picker not available, use provided saveDirectory
-        final destDirPath = targetDirPath ?? directory.path;
-        final destDir = Directory(destDirPath);
-        if (!await destDir.exists()) {
-          await destDir.create(recursive: true);
-        }
-
-        final file = File('${destDir.path}/$filename');
-        await file.writeAsBytes(fileBytes);
-        savedFiles.add(file.path);
-        logger.debug('✅ File saved: ${file.path} (${fileBytes.length} bytes)');
-      }
+      savedFiles.add(meta);
+      logger.debug(
+        'Saved upload to temp: ${meta['path']} (${meta['size']} bytes)',
+      );
     } else {
-      // Non-file form field (optional)
       final fieldContent = await utf8.decoder.bind(part).join();
       logger.debug('Field content: $fieldContent');
     }

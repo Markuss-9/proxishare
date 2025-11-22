@@ -7,6 +7,8 @@ import 'package:proxishare/logger.dart';
 import 'package:proxishare/server/error_handler.dart';
 import 'package:proxishare/server/middlewares.dart';
 import 'package:proxishare/server/upload.dart';
+import 'package:proxishare/server/local_server.dart';
+import 'package:proxishare/server/events.dart';
 
 Future<String> get _localPath async {
   final dir = await getApplicationDocumentsDirectory();
@@ -27,7 +29,16 @@ Future<void> serveTestFile(HttpRequest request) async {
 
 Future<void> serveUpload(HttpRequest request) async {
   final path = await _localPath;
-  handleFileUpload(request, "$path/ProxiShare");
+  try {
+    final saved = await handleFileUpload(request, "$path/ProxiShare");
+    if (saved.isNotEmpty) {
+      final files = saved.map((m) => UploadedFile.fromMap(m)).toList();
+      LocalServer.current?.notifyEvent(UploadEvent(files));
+    }
+  } catch (e, st) {
+    logger.error('serveUpload failed: $e\n$st');
+    sendError(request, HttpStatus.internalServerError, 'Upload failed');
+  }
 }
 
 Future<void> serveWebui(HttpRequest request) async {

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:proxishare/components/toast.dart';
 import 'package:proxishare/server/local_server.dart';
+import 'package:proxishare/server/events.dart';
+import 'package:proxishare/components/upload_dialog.dart';
 import 'package:proxishare/logger.dart';
 
 class LocalShareApp extends StatefulWidget {
@@ -15,9 +17,20 @@ class LocalShareApp extends StatefulWidget {
 class LocalShareAppState extends State<LocalShareApp> {
   LocalServer? server;
 
+  final TextEditingController portController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
+  }
+
+  void handleServerEvents(event) {
+    logger.info("SERVER EVENT: $event");
+    if (event is UploadEvent) {
+      showUploadDialog(context, event.files);
+    } else {
+      logger.warn("Unhandled server event: $event");
+    }
   }
 
   Future<void> startServer({int? port}) async {
@@ -30,6 +43,8 @@ class LocalShareAppState extends State<LocalShareApp> {
       setState(() {
         server = s;
       });
+
+      s.events.listen(handleServerEvents);
     } catch (e, st) {
       logger.error('Failed to start server: $e', error: e, stackTrace: st);
     }
@@ -38,37 +53,105 @@ class LocalShareAppState extends State<LocalShareApp> {
   @override
   Widget build(BuildContext context) {
     if (server == null) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          TextButton(
-            onPressed: () async {
-              startServer();
-            },
-            child: Text("Start the server"),
-          ),
-          TextButton(
-            onPressed: () async {
-              final path = await LogService.exportLogs();
-              if (path != null) {
-                showToast(context, 'Logs exported to:\n$path');
-              } else {
-                showToast(
-                  context,
-                  'Failed to export logs. Check storage permissions.',
-                );
-              }
-            },
-            child: Text('Export logs'),
-          ),
-        ],
+      final commonPorts = [8080, 5173, 3000];
+
+      return ValueListenableBuilder(
+        valueListenable: portController,
+        builder: (_, __, ___) {
+          final text = portController.text;
+          logger.debug("port text $text");
+          int? textPort = int.tryParse(text);
+          bool isAutomatic = text.isEmpty;
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: ChoiceChip(
+                      label: const Text('Automatic'),
+                      selected: isAutomatic,
+                      onSelected: (sel) {
+                        if (sel) {
+                          setState(() {
+                            portController.clear();
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  ...commonPorts.map(
+                    (p) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4.0),
+                      child: ChoiceChip(
+                        label: Text('$p'),
+                        selected: textPort == p,
+                        onSelected: (sel) {
+                          if (sel) {
+                            setState(() {
+                              portController.text = p.toString();
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: 200,
+                child: TextField(
+                  controller: portController,
+                  keyboardType: TextInputType.numberWithOptions(
+                    signed: false,
+                    decimal: false,
+                  ),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: 'Port (optional)',
+                    helperText: 'Leave blank for automatic port selection',
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final text = portController.text;
+                  final port = (text.isEmpty) ? null : int.tryParse(text);
+                  await startServer(
+                    port: (port != null && port > 0) ? port : null,
+                  );
+                },
+                child: const Text("Start the server"),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final path = await LogService.exportLogs();
+                  if (path != null) {
+                    showToast(context, 'Logs exported to:\n$path');
+                  } else {
+                    showToast(
+                      context,
+                      'Failed to export logs. Check storage permissions.',
+                    );
+                  }
+                },
+                child: const Text('Export logs'),
+              ),
+            ],
+          );
+        },
       );
     }
 
     final LocalServer s = server!;
 
     if (s.loading) {
-      return CircularProgressIndicator();
+      return const CircularProgressIndicator();
     }
 
     final url = s.url!;
@@ -77,7 +160,7 @@ class LocalShareAppState extends State<LocalShareApp> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('Server running at:'),
+        const Text('Server running at:'),
         SelectableText(url, style: const TextStyle(fontSize: 16)),
         const SizedBox(height: 50),
         InkWell(
@@ -112,9 +195,10 @@ class LocalShareAppState extends State<LocalShareApp> {
             server?.stop();
             setState(() {
               server = null;
+              portController.clear();
             });
           },
-          child: Text("Stop the server"),
+          child: const Text("Stop the server"),
         ),
         TextButton(
           onPressed: () async {
@@ -128,7 +212,7 @@ class LocalShareAppState extends State<LocalShareApp> {
               );
             }
           },
-          child: Text('Export logs'),
+          child: const Text('Export logs'),
         ),
       ],
     );
@@ -137,6 +221,7 @@ class LocalShareAppState extends State<LocalShareApp> {
   @override
   void dispose() {
     server?.stop();
+    portController.dispose();
     super.dispose();
   }
 }
