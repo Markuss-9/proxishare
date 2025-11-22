@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:proxishare/server/events.dart';
 import 'package:proxishare/components/toast.dart';
 import 'package:proxishare/logger.dart';
+import 'package:proxishare/services/notifications/notification_service.dart';
 
 Future<void> showUploadDialog(
   BuildContext context,
@@ -13,13 +14,21 @@ Future<void> showUploadDialog(
 ) async {
   if (!context.mounted) return;
 
-  final fileNames = files.map((f) => f.filename).join(', ');
+  final fileNames = files.map((f) => f.filename);
+
+  await NotificationService.showNewMediaReceived(fileNames)
+      .then((_) {
+        logger.info('Notification shown for uploaded files');
+      })
+      .catchError((e) {
+        logger.error('Failed to show notification', error: e);
+      });
 
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('New upload received'),
-      content: Text('Files: $fileNames'),
+      content: Text('Files: ${fileNames.join(', ')}'),
       actions: [
         TextButton(
           onPressed: () async {

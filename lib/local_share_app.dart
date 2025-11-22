@@ -8,6 +8,8 @@ import 'package:proxishare/server/events.dart';
 import 'package:proxishare/components/upload_dialog.dart';
 import 'package:proxishare/logger.dart';
 
+const commonPorts = [8080, 5173, 3000];
+
 class LocalShareApp extends StatefulWidget {
   const LocalShareApp({super.key});
   @override
@@ -53,13 +55,10 @@ class LocalShareAppState extends State<LocalShareApp> {
   @override
   Widget build(BuildContext context) {
     if (server == null) {
-      final commonPorts = [8080, 5173, 3000];
-
       return ValueListenableBuilder(
         valueListenable: portController,
         builder: (_, __, ___) {
           final text = portController.text;
-          logger.debug("port text $text");
           int? textPort = int.tryParse(text);
           bool isAutomatic = text.isEmpty;
           return Column(
