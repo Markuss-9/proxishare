@@ -28,5 +28,16 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+
+	<!-- Gal plugin for saving on gallery -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow Proxishare to access your photo library for saving files</string>
+	<!-- End Gal plugin for saving on gallery -->
+
+	<!-- Local notifications plugin -->
+	<key>NSUserNotificationUsageDescription</key>
+	<string>We use notifications to alert you about stuff</string>
+	<!-- End Local notifications plugin -->
+
 </dict>
 </plist>

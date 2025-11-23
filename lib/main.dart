@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:proxishare/local_share_app.dart';
+import 'package:proxishare/services/notifications/notification_initialization.dart';
 
 import 'package:proxishare/themes.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await NotificationInitialization.initialize();
+
   runApp(const App());
 }
 

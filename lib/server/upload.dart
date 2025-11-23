@@ -6,12 +6,12 @@ import 'package:proxishare/logger.dart';
 
 /// Handles a single HTTP request containing multipart/form-data (file upload)
 /// and saves uploaded files to [saveDirectory].
-/// Returns a list of saved file paths.
-Future<List<String>> handleFileUpload(
+/// Returns a list of maps with keys: `filename`, `path`, `mime`, `size`
+Future<List<Map<String, dynamic>>> handleFileUpload(
   HttpRequest request,
   String saveDirectory,
 ) async {
-  final savedFiles = <String>[];
+  final savedFiles = <Map<String, dynamic>>[];
 
   // Only POST requests with multipart/form-data
   if (request.method != 'POST' ||
@@ -23,7 +23,6 @@ Future<List<String>> handleFileUpload(
     return savedFiles;
   }
 
-  // Get boundary from Content-Type header
   final boundary = request.headers.contentType?.parameters['boundary'];
   if (boundary == null) {
     request.response
@@ -33,11 +32,9 @@ Future<List<String>> handleFileUpload(
     return savedFiles;
   }
 
-  // Create directory if it doesn't exist
-  final directory = Directory(saveDirectory);
-  if (!await directory.exists()) {
-    await directory.create(recursive: true);
-  }
+  // ensure temp dir exists
+  final tmpBase = Directory('${Directory.systemTemp.path}/proxishare_uploads');
+  if (!await tmpBase.exists()) await tmpBase.create(recursive: true);
 
   // Parse multipart parts
   final transformer = MimeMultipartTransformer(boundary);
@@ -56,12 +53,25 @@ Future<List<String>> handleFileUpload(
         return prev;
       });
 
-      final file = File('${directory.path}/$filename');
-      await file.writeAsBytes(fileBytes);
-      savedFiles.add(file.path);
-      logger.debug('✅ File saved: ${file.path} (${fileBytes.length} bytes)');
+      final mimeType = lookupMimeType(filename, headerBytes: fileBytes) ?? '';
+
+      // write to temp file
+      final safeName = filename.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final tmpFile = File('${tmpBase.path}/$safeName');
+      await tmpFile.writeAsBytes(fileBytes, flush: true);
+
+      final meta = <String, dynamic>{
+        'filename': filename,
+        'path': tmpFile.path,
+        'mime': mimeType,
+        'size': await tmpFile.length(),
+      };
+
+      savedFiles.add(meta);
+      logger.debug(
+        'Saved upload to temp: ${meta['path']} (${meta['size']} bytes)',
+      );
     } else {
-      // Non-file form field (optional)
       final fieldContent = await utf8.decoder.bind(part).join();
       logger.debug('Field content: $fieldContent');
     }

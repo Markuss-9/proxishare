@@ -1,3 +1,5 @@
+.PHONY: install-webui build-webui test-webui install-flutter test check-build-webui apk
+
 install-webui:
 	cd webui && npm install
 
@@ -15,3 +17,7 @@ test:
 
 check-build-webui:
 	find assets/webui -mindepth 1 -print -quit >/dev/null 2>&1
+
+apk:
+	flutter build apk --release 
+	flutter install --release

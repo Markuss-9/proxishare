@@ -41,6 +41,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Gal plugin for saving on gallery -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Allow Proxishare to save photos and videos to your photo library</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow Proxishare to access your photo library for saving files</string>
+	<!-- End Gal plugin for saving on gallery -->
+
+	<!-- Local notifications plugin -->
+	<key>NSUserNotificationUsageDescription</key>
+	<string>We use notifications to alert you about stuff</string>
+	<!-- End Local notifications plugin -->
+
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

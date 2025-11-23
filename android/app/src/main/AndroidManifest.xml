@@ -2,7 +2,8 @@
     <application
         android:label="proxishare"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true"> <!-- Gal: For saving to album in API 29 :Gal-->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -30,6 +31,12 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- flutter local notifications. default to mediaPlayback even if i dont play music -->
+        <service
+            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -53,4 +60,7 @@
 
     <!-- Permissions options for the `manage external storage` group -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- flutter local notifications -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 </manifest>
