@@ -10,6 +10,11 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+
+    env:
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -37,30 +42,49 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ANDROID_HOME }}
+          key: android-sdk-${{ runner.os }}
+
       - name: Setup Android SDK
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-          mkdir -p $HOME/Android/cmdline-tools
+          mkdir -p $ANDROID_HOME/cmdline-tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip -O cmdline-tools.zip
-          unzip cmdline-tools.zip -d $HOME/Android/cmdline-tools
-          export ANDROID_HOME=$HOME/Android
-          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/cmdline-tools/bin:$PATH
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
-          echo "ANDROID_HOME=$HOME/Android" >> $GITHUB_ENV
-          echo "$HOME/Android/platform-tools" >> $GITHUB_PATH
+          unzip cmdline-tools.zip
+          mv cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.35.6
+          cache: true
 
-      - name: Install + Test + Build  flutter application
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}
+
+      - name: Install + Test + Build flutter application
         run: |
           make install-flutter
           make test
-          flutter build apk
+          flutter build apk --release
 
       - name: Upload build artifact
         if: env.ACT != 'true'
@@ -68,3 +92,4 @@ jobs:
         with:
           name: apk-build
           path: build/app/outputs/flutter-apk/app-release.apk
+
