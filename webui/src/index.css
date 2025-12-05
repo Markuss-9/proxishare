@@ -119,3 +119,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+.progress-bar {
+  transition: width 0.6s ease-out;
+}
+
+@keyframes progress-smooth {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: var(--progress, 0%);
+  }
+}

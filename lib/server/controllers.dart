@@ -27,16 +27,30 @@ Future<void> serveTestFile(HttpRequest request) async {
       .whenComplete(() => request.response.close());
 }
 
-Future<void> serveUpload(HttpRequest request) async {
+Future<void> serveUploadMedia(HttpRequest request) async {
   final path = await _localPath;
   try {
     final saved = await handleFileUpload(request, "$path/ProxiShare");
     if (saved.isNotEmpty) {
       final files = saved.map((m) => UploadedFile.fromMap(m)).toList();
-      LocalServer.current?.notifyEvent(UploadEvent(files));
+      LocalServer.current?.notifyEvent(UploadMediaEvent(files));
     }
   } catch (e, st) {
-    logger.error('serveUpload failed: $e\n$st');
+    logger.error('serveUploadMedia failed: $e\n$st');
+    sendError(request, HttpStatus.internalServerError, 'Upload failed');
+  }
+}
+
+Future<void> serveUploadFiles(HttpRequest request) async {
+  final path = await _localPath;
+  try {
+    final saved = await handleFileUpload(request, "$path/ProxiShare");
+    if (saved.isNotEmpty) {
+      final files = saved.map((m) => UploadedFile.fromMap(m)).toList();
+      LocalServer.current?.notifyEvent(UploadFilesEvent(files));
+    }
+  } catch (e, st) {
+    logger.error('serveUploadFiles failed: $e\n$st');
     sendError(request, HttpStatus.internalServerError, 'Upload failed');
   }
 }

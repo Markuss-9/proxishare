@@ -38,7 +38,12 @@ abstract class ServerEvent {
   const ServerEvent(this.type);
 }
 
-class UploadEvent extends ServerEvent {
+class UploadMediaEvent extends ServerEvent {
   final List<UploadedFile> files;
-  const UploadEvent(this.files) : super(ServerEventType.upload);
+  const UploadMediaEvent(this.files) : super(ServerEventType.upload);
+}
+
+class UploadFilesEvent extends ServerEvent {
+  final List<UploadedFile> files;
+  const UploadFilesEvent(this.files) : super(ServerEventType.upload);
 }

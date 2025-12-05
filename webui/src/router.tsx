@@ -28,7 +28,7 @@ function NotFound() {
   return <div>Route not found</div>;
 }
 
-export function ErrorBoundary() {
+function ErrorBoundary() {
   const error = useRouteError();
 
   if (isRouteErrorResponse(error)) {
