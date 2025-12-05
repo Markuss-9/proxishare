@@ -5,6 +5,7 @@ import ControlPanel from '@/components/ControlPanel';
 import FileSection from '@/components/FileSection';
 import { Moon, Sun } from 'lucide-react';
 import { partition } from '@/lib/utils';
+import { nanoid } from 'nanoid';
 
 export default function Homepage() {
   const { files, setFiles } = useMediaStore();
@@ -51,7 +52,7 @@ export default function Homepage() {
         next.push({
           file: f,
           url: URL.createObjectURL(f),
-          id: crypto.randomUUID(),
+          id: nanoid(),
         });
     });
     setFiles(next);

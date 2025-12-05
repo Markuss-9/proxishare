@@ -28,7 +28,7 @@ class LocalShareAppState extends State<LocalShareApp> {
 
   void handleServerEvents(event) {
     logger.info("SERVER EVENT: $event");
-    if (event is UploadEvent) {
+    if (event is UploadMediaEvent) {
       showUploadDialog(context, event.files);
     } else {
       logger.warn("Unhandled server event: $event");

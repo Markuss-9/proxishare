@@ -9,7 +9,8 @@ typedef RoutesType = Map<String, RouteHandler>;
 class Router {
   final RoutesType routes = {
     '/test.txt': serveTestFile,
-    '/upload': serveUpload,
+    '/upload/media': serveUploadMedia,
+    '/upload/files': serveUploadFiles,
     '/webui': serveWebui,
   };
   void addRoute(String path, Future<void> Function(HttpRequest) handler) {

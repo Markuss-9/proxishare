@@ -39,14 +39,11 @@ export default function ControlPanel({ onAddFiles }: ControlPanelProps) {
       });
 
       setProgress(100);
-      setTimeout(() => {
-        setFiles([]);
-        setProgress(0);
-      }, 700);
     } catch (error) {
       setError(error as Error);
     } finally {
-      setUploading(false);
+      setTimeout(() => setUploading(false), 1000);
+      setTimeout(() => setProgress(0), 1500);
     }
   };
 
@@ -76,29 +73,44 @@ export default function ControlPanel({ onAddFiles }: ControlPanelProps) {
         />
       </div>
 
-      {uploading ? (
-        <Progress value={progress} className="w-full" />
-      ) : (
+      <div className="flex flex-col gap-3">
+        <div
+          className="h-2 transition-opacity duration-500"
+          style={{ opacity: uploading ? 1 : 0 }}
+        >
+          <Progress
+            value={progress}
+            className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden [&>div]:transition-all [&>div]:duration-600 [&>div]:ease-out"
+          />
+        </div>
         <div className="flex gap-2">
           <Button
             onClick={handleShare}
-            disabled={!files || files.length === 0}
-            className="flex-1"
+            disabled={!files || files.length === 0 || uploading}
+            className="flex-1 transition-all duration-200"
           >
-            Share
+            {uploading ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin">⏳</span>
+                Uploading...
+              </span>
+            ) : (
+              'Share'
+            )}
           </Button>
           <Button
             variant="outline"
             onClick={() => setFiles([])}
-            disabled={!files || files.length === 0}
+            disabled={!files || files.length === 0 || uploading}
+            className="transition-all duration-200"
           >
             Clear
           </Button>
         </div>
-      )}
+      </div>
 
       {error && (
-        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 p-3 rounded">
+        <div className="text-sm text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/40 p-3 rounded border-l-4 border-red-600 dark:border-red-500 animate-in slide-in-from-top-2 zoom-in-95 duration-400">
           {error.message}
         </div>
       )}
