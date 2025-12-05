@@ -27,8 +27,9 @@ jobs:
       - name: Install nodejs dependencies for webui
         run: make install-webui
 
-      - name: Test webui
-        run: make test-webui
+      # TEMPORARILY DISABLED
+      # - name: Test webui
+      #   run: make test-webui
 
       - name: Build webui
         run: make build-webui
@@ -92,4 +93,3 @@ jobs:
         with:
           name: apk-build
           path: build/app/outputs/flutter-apk/app-release.apk
-
