@@ -27,9 +27,8 @@ jobs:
       - name: Install nodejs dependencies for webui
         run: make install-webui
 
-      # TEMPORARILY DISABLED
-      # - name: Test webui
-      #   run: make test-webui
+      - name: Test webui
+        run: make test-webui
 
       - name: Build webui
         run: make build-webui
