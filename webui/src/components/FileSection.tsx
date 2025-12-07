@@ -35,6 +35,13 @@ export default function FileSection({
     setSelectionMode(false);
   };
 
+  const toggleSelectionMode = () => {
+    setSelectionMode((s) => {
+      if (s) setSelectedIndices(new Set());
+      return !s;
+    });
+  };
+
   if (!files || files.length === 0) {
     return (
       <div className="w-full lg:w-2/3 flex items-center justify-center min-h-96 text-gray-400 dark:text-gray-500">
@@ -53,7 +60,7 @@ export default function FileSection({
           <Button
             variant={selectionMode ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setSelectionMode((s) => !s)}
+            onClick={toggleSelectionMode}
           >
             {selectionMode ? 'Exit' : 'Select'}
           </Button>
