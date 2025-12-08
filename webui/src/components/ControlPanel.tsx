@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { LocalServer } from '@/client';
 import ModeToggle from './ModeToggle';
+import JSZip from 'jszip';
 
 interface ControlPanelProps {
   onAddFiles: (files: File[]) => void;
@@ -15,12 +16,38 @@ export default function ControlPanel({ onAddFiles }: ControlPanelProps) {
   const [error, setError] = useState<Error>();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectFolder = async (folderFiles: File[]) => {
+    const zip = new JSZip();
+
+    const folderName = folderFiles[0].webkitRelativePath.split('/')[0];
+    folderFiles.forEach((file) => {
+      // Preserve folder structure if available
+      const path = file.webkitRelativePath || file.name;
+      zip.file(path, file);
+    });
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const zipFile = new File([blob], `${folderName}.zip`, {
+      type: 'application/zip',
+    });
+    onAddFiles([zipFile]);
+  };
+
+  const handleSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
     const fileList = e.target.files;
-    if (!fileList) return;
+    if (!fileList || !fileList.length) return;
+
     const newFiles = Array.from(fileList);
+
+    if (mode === 'folder') {
+      await handleSelectFolder(newFiles);
+      input.value = '';
+      return;
+    }
+
     onAddFiles(newFiles);
-    e.currentTarget.value = '';
+    input.value = '';
   };
 
   const handleShare = async () => {
@@ -50,27 +77,31 @@ export default function ControlPanel({ onAddFiles }: ControlPanelProps) {
   return (
     <div className="w-full lg:w-1/3 flex flex-col gap-4">
       <div className="flex flex-col gap-3">
-        <label htmlFor="file-input" className="sr-only">
-          Select file
-        </label>
         <ModeToggle />
 
+        <label htmlFor="file-input" className="sr-only">
+          Choose Files
+        </label>
         <input
           ref={fileInputRef}
           id="file-input"
           type="file"
           multiple
+          {...((mode === 'folder'
+            ? { webkitdirectory: '', directory: '' }
+            : {}) as any)}
           accept={mode === 'media' ? 'image/*,video/*' : undefined}
           onChange={handleSelect}
-          className="block w-full text-sm text-gray-500 dark:text-gray-400
-            file:mr-4 file:py-2 file:px-4
-            file:rounded file:border-0
-            file:text-sm file:font-semibold
-            file:bg-indigo-50 file:text-indigo-700
-            dark:file:bg-indigo-900 dark:file:text-indigo-200
-            hover:file:bg-indigo-100 dark:hover:file:bg-indigo-800
-            cursor-pointer"
+          className="sr-only"
         />
+
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+        >
+          Choose Files
+        </button>
       </div>
 
       <div className="flex flex-col gap-3">

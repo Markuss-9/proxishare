@@ -7,13 +7,13 @@ export interface FileEnriched {
   id: FileId;
 }
 
+export type ModeOptions = 'media' | 'all' | 'folder';
+
 type MediaState = {
-  // allow multiple file selection
   files: FileEnriched[];
   setFiles: (files: FileEnriched[]) => void;
-  // mode: media (images/videos) or generic files
-  mode: 'media' | 'files';
-  setMode: (m: 'media' | 'files') => void;
+  mode: ModeOptions;
+  setMode: (m: ModeOptions) => void;
   uploading: boolean;
   setUploading: (state: boolean) => void;
 };
