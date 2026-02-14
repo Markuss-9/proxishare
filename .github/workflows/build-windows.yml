@@ -44,15 +44,17 @@ jobs:
           make test
           flutter build windows --release
 
-      - name: Activate MSIX tool
-        run: dart pub global activate msix
+      - name: Install Inno Setup
+        run: choco install innosetup -y
 
-      - name: Create MSIX package
-        run: dart pub global run msix:create
+      - name: Build Installer
+        run: |
+          $version = (Select-String -Path 'pubspec.yaml' -Pattern 'version:\s+([\d.]+)' | % {$_.Matches[0].Groups[1].Value})
+          iscc /DAppVersion=$version proxishare.iss
 
       - name: Upload build artifact
         if: env.ACT != 'true'
         uses: actions/upload-artifact@v5
         with:
-          name: ProxiShare.msix
-          path: build/windows/x64/runner/Release/proxishare.msix
+          name: ProxiShare-installer
+          path: installer/ProxiShare-Setup-*.exe
