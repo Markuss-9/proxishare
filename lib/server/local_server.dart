@@ -3,42 +3,46 @@ import 'dart:io';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:proxishare/logger.dart';
 import 'package:proxishare/server/events.dart';
-import 'package:proxishare/server/error_handler.dart';
 import 'package:proxishare/server/middlewares.dart';
-
+import 'package:shelf/shelf.dart';
+import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:proxishare/server/router.dart';
 
 class LocalServer {
   int? port;
-  HttpServer? _server;
   String? ipAddress;
   String? url;
   bool loading = true;
   final _events = StreamController<ServerEvent>.broadcast();
   static LocalServer? current;
+  HttpServer? _shelfServer;
 
   LocalServer({this.port});
 
   Stream<ServerEvent> get events => _events.stream;
 
-  Router router = Router();
-
   Future<void> start() async {
     logger.info('Starting local server...');
 
-    // register singleton so controllers can notify
     LocalServer.current = this;
 
     ipAddress = await getBestIPAddress();
     logger.info('Server IP: $ipAddress');
 
-    _server = await HttpServer.bind(InternetAddress.anyIPv4, port ?? 0);
-    port = _server!.port;
+    _shelfServer = await shelf_io.serve(
+      Pipeline()
+          .addMiddleware(Middlewares.handleCorsShelf())
+          .addMiddleware(Middlewares.handleErrors())
+          .addMiddleware(logRequests())
+          .addHandler(_createCascadeHandler()),
+      InternetAddress.anyIPv4,
+      port ?? 0,
+    );
 
+    port = _shelfServer!.port;
     url = "http://$ipAddress:$port";
     logger.info('Server running on $url');
 
-    _server!.listen(_handleRequest);
     loading = false;
   }
 
@@ -51,49 +55,12 @@ class LocalServer {
   }
 
   Future<void> stop() async {
-    await _server?.close(force: true);
+    await _shelfServer?.close();
     logger.info('Server stopped.');
     try {
       LocalServer.current = null;
       await _events.close();
     } catch (_) {}
-  }
-
-  Future<void> _handleRequest(HttpRequest request) async {
-    logger.trace('Request: ${request.method} ${request.uri.path}');
-    Middlewares.handleCors(request);
-
-    var handler = router.routes[request.uri.path];
-
-    // If no exact match, check for prefix-based route
-    if (handler == null) {
-      for (var entry in router.routes.entries) {
-        final check = request.uri.path.startsWith("${entry.key}/");
-        logger.debug(
-          "searching for request ${request.uri.path} if matching entry ${entry.key}/   $check",
-        );
-        if (request.uri.path.startsWith("${entry.key}/")) {
-          logger.debug("found ${entry.key}");
-          handler = entry.value;
-          break;
-        }
-      }
-    }
-
-    if (handler != null) {
-      try {
-        await handler(request);
-      } on Error catch (e, st) {
-        logger.error('REAL Error handling ${request.uri.path}: $e\n$st');
-        sendJsonError(request, HttpStatus.internalServerError, e);
-      } catch (e, st) {
-        logger.error('Error handling ${request.uri.path}: $e\n$st');
-        sendError(request, HttpStatus.notFound, 'Route not found');
-      }
-    } else {
-      logger.error("Route ${request.uri.path} not found");
-      sendError(request, HttpStatus.notFound, 'Route not found');
-    }
   }
 
   /// ========== Utilities ==========
@@ -113,20 +80,6 @@ class LocalServer {
 
     ip ??= '127.0.0.1';
 
-    // if (_isAndroidEmulator(ip)) {
-    //   logger.debug(
-    //     'Detected Android Emulator IP: $ip — remapping to 10.0.2.2 (host)',
-    //   );
-    //   return '10.0.2.2';
-    // }
-
-    // if (_isiOSSimulator(ip)) {
-    //   logger.debug(
-    //     'Detected iOS Simulator IP: $ip — remapping to 127.0.0.1 (host)',
-    //   );
-    //   return '127.0.0.1';
-    // }
-
     return ip;
   }
 
@@ -142,7 +95,6 @@ class LocalServer {
       );
 
       for (final interface in interfaces) {
-        // Skip virtual or docker interfaces
         if (interface.name.startsWith('docker') ||
             interface.name.startsWith('veth') ||
             interface.name.startsWith('br-')) {
@@ -151,11 +103,8 @@ class LocalServer {
 
         for (final addr in interface.addresses) {
           final address = addr.address;
-          // Skip link-local
           if (address.startsWith('169.254.')) continue;
-          // Only take 192.168.x.x (your home network)
           if (address.startsWith('192.168.')) return address;
-          // Optional: include 10.x.x.x if you know the subnet is reachable
         }
       }
 
@@ -166,13 +115,35 @@ class LocalServer {
     return null;
   }
 
-  bool _isAndroidEmulator(String ip) {
-    // Android emulators use 10.0.2.x (default) or 10.0.3.x (Genymotion)
-    return ip.startsWith('10.0.2.') || ip.startsWith('10.0.3.');
-  }
-
-  bool _isiOSSimulator(String ip) {
-    // iOS simulator often uses 127.0.0.1 or 0.0.0.0
-    return ip == '127.0.0.1' || ip == '0.0.0.0';
+  Handler _createCascadeHandler() {
+    return (Request request) async {
+      try {
+        return await router.call(request);
+      } on HttpException catch (e) {
+        final path = request.url.path;
+        if (path.startsWith('webui') || path.isEmpty || path == '/') {
+          return Response(
+            HttpStatus.notFound,
+            body: '<h2>404 Not Found</h2><p>${e.message}</p>',
+            headers: {'Content-Type': 'text/html'},
+          );
+        }
+        return Response(HttpStatus.notFound, body: '{"error": "Not found"}');
+      } catch (e, st) {
+        logger.error('Error handling ${request.url}: $e\n$st');
+        final path = request.url.path;
+        if (path.startsWith('webui') || path.isEmpty || path == '/') {
+          return Response(
+            HttpStatus.internalServerError,
+            body: '<h2>500 Internal Server Error</h2><p>$e</p>',
+            headers: {'Content-Type': 'text/html'},
+          );
+        }
+        return Response(
+          HttpStatus.internalServerError,
+          body: '{"error": "Internal server error"}',
+        );
+      }
+    };
   }
 }

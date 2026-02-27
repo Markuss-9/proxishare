@@ -3,17 +3,68 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:mime/mime.dart';
 import 'package:proxishare/logger.dart';
+import 'package:shelf/shelf.dart';
+import 'package:shelf_multipart/shelf_multipart.dart';
 
-/// Handles a single HTTP request containing multipart/form-data (file upload)
-/// and saves uploaded files to [saveDirectory].
-/// Returns a list of maps with keys: `filename`, `path`, `mime`, `size`
+Future<List<Map<String, dynamic>>> handleShelfFileUpload(
+  Request request,
+  String saveDirectory,
+) async {
+  final savedFiles = <Map<String, dynamic>>[];
+
+  if (request.method != 'POST' ||
+      request.headers['content-type']?.contains('multipart/form-data') !=
+          true) {
+    throw Exception('Only POST with multipart/form-data supported');
+  }
+
+  final tmpBase = Directory('${Directory.systemTemp.path}/proxishare_uploads');
+  if (!await tmpBase.exists()) await tmpBase.create(recursive: true);
+
+  final multipart = request.multipart();
+  if (multipart == null) {
+    throw Exception('Not a multipart request');
+  }
+
+  await for (final part in multipart.parts) {
+    final contentDisposition = part.headers['content-disposition'];
+    if (contentDisposition == null) continue;
+
+    final filenameMatch = RegExp(
+      r'filename="([^"]+)"',
+    ).firstMatch(contentDisposition);
+    if (filenameMatch == null) continue;
+    final filename = filenameMatch.group(1)!;
+
+    final fileBytes = await part.readBytes();
+    final mimeType = lookupMimeType(filename, headerBytes: fileBytes) ?? '';
+
+    final safeName = filename.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final tmpFile = File('${tmpBase.path}/$safeName');
+    await tmpFile.writeAsBytes(fileBytes, flush: true);
+
+    final meta = <String, dynamic>{
+      'filename': filename,
+      'path': tmpFile.path,
+      'mime': mimeType,
+      'size': await tmpFile.length(),
+    };
+
+    savedFiles.add(meta);
+    logger.debug(
+      'Saved upload to temp: ${meta['path']} (${meta['size']} bytes)',
+    );
+  }
+
+  return savedFiles;
+}
+
 Future<List<Map<String, dynamic>>> handleFileUpload(
   HttpRequest request,
   String saveDirectory,
 ) async {
   final savedFiles = <Map<String, dynamic>>[];
 
-  // Only POST requests with multipart/form-data
   if (request.method != 'POST' ||
       request.headers.contentType?.mimeType != 'multipart/form-data') {
     request.response
@@ -32,11 +83,9 @@ Future<List<Map<String, dynamic>>> handleFileUpload(
     return savedFiles;
   }
 
-  // ensure temp dir exists
   final tmpBase = Directory('${Directory.systemTemp.path}/proxishare_uploads');
   if (!await tmpBase.exists()) await tmpBase.create(recursive: true);
 
-  // Parse multipart parts
   final transformer = MimeMultipartTransformer(boundary);
   await for (final part in transformer.bind(request)) {
     final contentDisposition = part.headers['content-disposition'];
@@ -47,7 +96,6 @@ Future<List<Map<String, dynamic>>> handleFileUpload(
     ).firstMatch(contentDisposition)?.group(1);
 
     if (filename != null) {
-      // Read binary data
       final fileBytes = await part.fold<List<int>>([], (prev, element) {
         prev.addAll(element);
         return prev;
@@ -55,7 +103,6 @@ Future<List<Map<String, dynamic>>> handleFileUpload(
 
       final mimeType = lookupMimeType(filename, headerBytes: fileBytes) ?? '';
 
-      // write to temp file
       final safeName = filename.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final tmpFile = File('${tmpBase.path}/$safeName');
       await tmpFile.writeAsBytes(fileBytes, flush: true);

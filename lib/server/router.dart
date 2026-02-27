@@ -1,19 +1,16 @@
-import 'dart:io' show HttpRequest;
-
+import 'package:proxishare/server/middlewares.dart';
+import 'package:shelf/shelf.dart';
+import 'package:shelf_router/shelf_router.dart';
 import 'package:proxishare/server/controllers.dart';
 
-typedef RouteHandler = Future<void> Function(HttpRequest request);
-
-typedef RoutesType = Map<String, RouteHandler>;
-
-class Router {
-  final RoutesType routes = {
-    '/test.txt': serveTestFile,
-    '/upload/media': serveUploadMedia,
-    '/upload/files': serveUploadFiles,
-    '/webui': serveWebui,
-  };
-  void addRoute(String path, Future<void> Function(HttpRequest) handler) {
-    routes[path] = handler;
-  }
-}
+final router = Router()
+  ..get('/test.txt', serveTestFile)
+  ..post('/upload/media', serveUploadMedia)
+  ..post('/upload/files', serveUploadFiles)
+  ..get('/webui', serveWebui)
+  ..get(
+    '/webui/<path|.*>',
+    Pipeline()
+        .addMiddleware(Middlewares.addCacheControl(maxAge: 2592000))
+        .addHandler(serveWebui),
+  );

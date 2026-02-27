@@ -1,28 +1,50 @@
-import 'dart:io' show HttpRequest;
+import 'package:shelf/shelf.dart';
+import 'package:proxishare/logger.dart';
 
 abstract class Middlewares {
-  static void handleCors(HttpRequest request) {
-    request.response.headers
-      ..add('Access-Control-Allow-Origin', '*')
-      ..add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-      ..add('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept');
-  }
-
-  static void addCacheControl(HttpRequest request, {required maxAge}) {
-    request.response.headers.add(
-      'Cache-Control',
-      'public, max-age=$maxAge, immutable',
+  static Middleware handleCorsShelf() {
+    return createMiddleware(
+      requestHandler: (Request request) {
+        if (request.method == 'OPTIONS') {
+          return Response.ok('', headers: _corsHeaders);
+        }
+        return null;
+      },
+      responseHandler: (Response response) {
+        return response.change(headers: _corsHeaders);
+      },
     );
   }
+
+  static Middleware addCacheControl({required int maxAge}) {
+    return createMiddleware(
+      responseHandler: (Response response) {
+        return response.change(
+          headers: {'Cache-Control': 'public, max-age=$maxAge, immutable'},
+        );
+      },
+    );
+  }
+
+  static Middleware handleErrors() {
+    return createMiddleware(
+      errorHandler: (Object error, StackTrace stackTrace) {
+        logger.error(
+          'Unhandled error: $error',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        return Response.internalServerError(
+          body: '{"error": "Internal server error"}',
+          headers: {'Content-Type': 'application/json'},
+        );
+      },
+    );
+  }
+
+  static const _corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Origin, Content-Type, Accept',
+  };
 }
-
-
- // if (request.method == 'OPTIONS') {
- //      request.response.statusCode = HttpStatus.noContent;
- //      await request.response.close();
- //      continue;
- //    }
-
-
-// so that only frontend can access those apis
-// request.response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000');
