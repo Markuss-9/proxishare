@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn, isImage, isVideo, isPdf, formatFileSize } from '@/lib/utils';
 import React, { useMemo } from 'react';
 
 type Props = {
@@ -7,10 +7,6 @@ type Props = {
   selected?: boolean;
   onRemove?: () => void;
 };
-
-const isImage = (type: string) => type.startsWith('image/');
-const isVideo = (type: string) => type.startsWith('video/');
-const isPdf = (type: string) => type === 'application/pdf';
 
 export default React.memo(function FileItem({
   file,
@@ -64,7 +60,7 @@ export default React.memo(function FileItem({
       <div className="p-2 text-xs text-left w-36">
         <div className="truncate font-medium">{file.name}</div>
         <div className="text-[11px] text-gray-400">
-          {Math.round(file.size / 1024)} KB
+          {formatFileSize(file.size)}
         </div>
       </div>
 

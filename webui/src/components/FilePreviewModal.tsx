@@ -1,13 +1,10 @@
 import type { FileEnriched } from '@/store';
+import { isImage, isVideo, isPdf } from '@/lib/utils';
 
 type Props = {
   file?: FileEnriched;
   onClose: () => void;
 };
-
-const isImage = (type: string) => type.startsWith('image/');
-const isVideo = (type: string) => type.startsWith('video/');
-const isPdf = (type: string) => type === 'application/pdf';
 
 export default function FilePreviewModal({ file, onClose }: Props) {
   if (!file) return null;

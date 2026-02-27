@@ -2,18 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import Router from './router.tsx';
+import { initTheme } from './hooks/useTheme.ts';
 
-// Apply theme on app load
-const theme =
-  localStorage.getItem('theme') ||
-  (window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light');
-if (theme === 'dark') {
-  document.documentElement.classList.add('dark');
-} else {
-  document.documentElement.classList.remove('dark');
-}
+initTheme();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

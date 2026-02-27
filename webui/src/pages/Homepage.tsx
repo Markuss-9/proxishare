@@ -1,73 +1,122 @@
-import { useEffect, useState } from 'react';
-import { useMediaStore, type FileId } from '@/store';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useMediaStore, type FileId, type FileEnriched } from '@/store';
 import FilePreviewModal from '@/components/FilePreviewModal';
 import ControlPanel from '@/components/ControlPanel';
 import FileSection from '@/components/FileSection';
-import { Moon, Sun } from 'lucide-react';
-import { partition } from '@/lib/utils';
+import { Sun, Moon, Upload, Wifi, WifiOff, Loader2 } from 'lucide-react';
 import { nanoid } from 'nanoid';
+import { useTheme } from '@/hooks/useTheme';
+import { useServerStatus } from '@/hooks/useServerStatus';
+
+function ConnectionIndicator() {
+  const { status, checkConnection } = useServerStatus();
+
+  return (
+    <button
+      onClick={checkConnection}
+      className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors"
+      title={status === 'disconnected' ? 'Click to retry' : undefined}
+    >
+      {status === 'checking' && (
+        <Loader2 className="w-3 h-3 animate-spin text-gray-400" />
+      )}
+      {status === 'connected' && (
+        <>
+          <Wifi className="w-3 h-3 text-green-500" />
+          <span className="text-green-600 dark:text-green-400">Connected</span>
+        </>
+      )}
+      {status === 'disconnected' && (
+        <>
+          <WifiOff className="w-3 h-3 text-red-500" />
+          <span className="text-red-600 dark:text-red-400">Offline</span>
+        </>
+      )}
+    </button>
+  );
+}
 
 export default function Homepage() {
-  const { files, setFiles } = useMediaStore();
+  const { files, addFiles, removeFiles } = useMediaStore();
   const [previewIndex, setPreviewIndex] = useState<FileId | null>(null);
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return (
-      localStorage.getItem('theme') === 'dark' ||
-      (!localStorage.getItem('theme') &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches)
-    );
-  });
+  const [isDragging, setIsDragging] = useState(false);
+  const { isDark, toggleTheme: toggleDarkMode } = useTheme();
 
-  const toggleDarkMode = () => {
-    setIsDark((prev) => {
-      const newValue = !prev;
-      if (newValue) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-      }
-      return newValue;
-    });
-  };
+  const filesRef = useRef(files);
+  filesRef.current = files;
 
-  // Apply dark mode on mount
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    return () => {
+      filesRef.current?.forEach((f) => URL.revokeObjectURL(f.url));
+    };
   }, []);
 
-  const handleAddFiles = (newFiles: File[]) => {
-    const existing = files ?? [];
-    const next = [...existing];
-    newFiles.forEach((f) => {
-      if (
-        !existing.some((e) => e.file.name === f.name && e.file.size === f.size)
-      )
-        next.push({
-          file: f,
-          url: URL.createObjectURL(f),
-          id: nanoid(),
-        });
-    });
-    setFiles(next);
-  };
+  const handleAddFiles = useCallback(
+    (newFiles: File[]) => {
+      const toAdd: FileEnriched[] = [];
+      newFiles.forEach((f) => {
+        const exists = (files ?? []).some(
+          (e) => e.file.name === f.name && e.file.size === f.size
+        );
+        if (!exists) {
+          toAdd.push({
+            file: f,
+            url: URL.createObjectURL(f),
+            id: nanoid(),
+          });
+        }
+      });
+      if (toAdd.length > 0) {
+        addFiles(toAdd);
+      }
+    },
+    [files, addFiles]
+  );
 
-  const handleRemoveFiles = (ids: FileId[]) => {
-    if (!files) return;
-    const [filesToRemove, newFiles] = partition(files, (f) =>
-      ids.includes(f.id)
-    );
-    filesToRemove.forEach((f) => {
-      URL.revokeObjectURL(f.url);
-    });
-    setFiles(newFiles);
-  };
+  const handleRemoveFiles = useCallback(
+    (ids: FileId[]) => {
+      removeFiles(ids);
+    },
+    [removeFiles]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      const items = e.dataTransfer.items;
+      const droppedFiles: File[] = [];
+
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.kind === 'file') {
+            const file = item.getAsFile();
+            if (file) droppedFiles.push(file);
+          }
+        }
+      }
+
+      if (droppedFiles.length > 0) {
+        handleAddFiles(droppedFiles);
+      }
+    },
+    [handleAddFiles]
+  );
 
   const previewFile = files?.find((f) => f.id === previewIndex);
 
@@ -76,9 +125,12 @@ export default function Homepage() {
       <div className="w-full max-w-6xl">
         <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg overflow-hidden border border-gray-200 dark:border-slate-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Local Media Share
-            </h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Local Media Share
+              </h1>
+              <ConnectionIndicator />
+            </div>
             <button
               onClick={toggleDarkMode}
               className="p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
@@ -88,7 +140,22 @@ export default function Homepage() {
             </button>
           </div>
 
-          <div className="p-6 flex flex-col lg:flex-row gap-8">
+          <div
+            className="p-6 flex flex-col lg:flex-row gap-8 relative"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isDragging && (
+              <div className="absolute inset-0 bg-indigo-500/10 dark:bg-indigo-500/20 border-2 border-dashed border-indigo-500 rounded-lg z-10 flex items-center justify-center">
+                <div className="bg-white dark:bg-slate-800 px-6 py-4 rounded-lg shadow-lg flex items-center gap-3">
+                  <Upload className="w-8 h-8 text-indigo-600" />
+                  <span className="text-lg font-medium text-gray-900 dark:text-white">
+                    Drop files here
+                  </span>
+                </div>
+              </div>
+            )}
             <ControlPanel onAddFiles={handleAddFiles} />
             <FileSection
               files={files}

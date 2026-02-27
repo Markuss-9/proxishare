@@ -4,11 +4,20 @@ import Homepage from '@/pages/Homepage';
 import * as store from '@/store';
 import * as client from '@/client';
 
+vi.mock('@/hooks/useServerStatus', () => ({
+  useServerStatus: () => ({
+    status: 'connected',
+    checkConnection: vi.fn(),
+  }),
+}));
+
 describe('Homepage', () => {
-  // Mock Zustand store
-  const mockSetFiles = vi.fn();
   const mockSetMode = vi.fn();
   const mockSetUploading = vi.fn();
+  const mockAddFiles = vi.fn();
+  const mockRemoveFiles = vi.fn();
+  const mockClearFiles = vi.fn();
+  const mockUpdateFileProgress = vi.fn();
 
   beforeEach(() => {
     vi.spyOn(client.LocalServer, 'post').mockResolvedValue({ data: 'ok' });
@@ -18,16 +27,24 @@ describe('Homepage', () => {
     vi.clearAllMocks();
   });
 
-  // helper to find the file input label (matches "Select file", "Choose Files", etc.)
+  const getMockStore = (overrides = {}) => ({
+    files: [],
+    setFiles: vi.fn(),
+    addFiles: mockAddFiles,
+    removeFiles: mockRemoveFiles,
+    clearFiles: mockClearFiles,
+    updateFileProgress: mockUpdateFileProgress,
+    mode: 'media',
+    setMode: mockSetMode,
+    uploading: false,
+    setUploading: mockSetUploading,
+    ...overrides,
+  });
+
   const getFileInput = () => screen.getByLabelText(/(select|choose)\s*files?/i);
 
-  const applyUpdater = (updater: any, prev: any) => {
-    if (typeof updater === 'function') return updater(prev);
-    // direct value (array/object) — return as-is
-    return updater;
-  };
-
   it('renders file input and disabled Share button initially', () => {
+    vi.spyOn(store, 'useMediaStore').mockReturnValue(getMockStore() as any);
     render(<Homepage />);
     const fileInput = getFileInput();
 
@@ -39,15 +56,8 @@ describe('Homepage', () => {
     expect(shareButton).toBeDisabled();
   });
 
-  it('calls setFiles when a file is selected', () => {
-    vi.spyOn(store, 'useMediaStore').mockReturnValue({
-      files: [],
-      setFiles: mockSetFiles,
-      mode: 'media',
-      setMode: mockSetMode,
-      uploading: false,
-      setUploading: mockSetUploading,
-    } as any);
+  it('calls addFiles when a file is selected', () => {
+    vi.spyOn(store, 'useMediaStore').mockReturnValue(getMockStore() as any);
 
     render(<Homepage />);
     const fileInput = getFileInput() as HTMLInputElement;
@@ -55,8 +65,8 @@ describe('Homepage', () => {
     const file = new File(['hello'], 'hello.png', { type: 'image/png' });
     fireEvent.change(fileInput, { target: { files: [file] } });
 
-    expect(mockSetFiles).toHaveBeenCalled();
-    expect(mockSetFiles).toHaveBeenCalledWith(
+    expect(mockAddFiles).toHaveBeenCalled();
+    expect(mockAddFiles).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           file: file,
@@ -69,14 +79,9 @@ describe('Homepage', () => {
     const file1 = new File(['a'], 'a.png', { type: 'image/png' });
     const file2 = new File(['b'], 'b.png', { type: 'image/png' });
 
-    vi.spyOn(store, 'useMediaStore').mockReturnValue({
-      files: [{ file: file1, url: 'blob:a', id: '1' }],
-      setFiles: mockSetFiles,
-      mode: 'media',
-      setMode: mockSetMode,
-      uploading: false,
-      setUploading: mockSetUploading,
-    } as any);
+    vi.spyOn(store, 'useMediaStore').mockReturnValue(
+      getMockStore({ files: [{ file: file1, url: 'blob:a', id: '1' }] }) as any
+    );
 
     render(<Homepage />);
     const fileInput = getFileInput() as HTMLInputElement;
@@ -84,19 +89,10 @@ describe('Homepage', () => {
       target: { files: [file2] },
     });
 
-    expect(mockSetFiles).toHaveBeenCalled();
-    const updater = mockSetFiles.mock.calls[0][0];
-    expect(typeof updater === 'function' || typeof updater === 'object').toBe(
-      true
-    );
-
-    const prev = [{ file: file1, url: 'blob:a', id: '1' }];
-    const result = applyUpdater(updater, prev);
-
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBe(2);
-    expect(result[0].file).toBe(file1);
-    expect(result[1].file).toBe(file2);
+    expect(mockAddFiles).toHaveBeenCalled();
+    const calledWith = mockAddFiles.mock.calls[0][0];
+    expect(calledWith).toHaveLength(1);
+    expect(calledWith[0].file).toBe(file2);
   });
 
   it('selects and removes multiple files when in selection mode', () => {
@@ -104,65 +100,41 @@ describe('Homepage', () => {
     const b = new File(['b'], 'b.png', { type: 'image/png' });
     const c = new File(['c'], 'c.png', { type: 'image/png' });
 
-    vi.restoreAllMocks();
-    vi.spyOn(store, 'useMediaStore').mockReturnValue({
-      files: [
-        { file: a, url: 'blob:a', id: '1' },
-        { file: b, url: 'blob:b', id: '2' },
-        { file: c, url: 'blob:c', id: '3' },
-      ],
-      setFiles: mockSetFiles,
-      mode: 'media',
-      setMode: mockSetMode,
-      uploading: false,
-      setUploading: mockSetUploading,
-    } as any);
+    vi.spyOn(store, 'useMediaStore').mockReturnValue(
+      getMockStore({
+        files: [
+          { file: a, url: 'blob:a', id: '1' },
+          { file: b, url: 'blob:b', id: '2' },
+          { file: c, url: 'blob:c', id: '3' },
+        ],
+      }) as any
+    );
 
     render(<Homepage />);
 
-    // enter selection mode via the selection/choose button (not by clicking file input)
     const selectBtn = screen.getByRole('button', {
       name: /Select/i,
     });
     fireEvent.click(selectBtn);
 
-    // click two items (by name)
     const itemA = screen.getByText(/a.png/i);
     const itemC = screen.getByText(/c.png/i);
     fireEvent.click(itemA);
     fireEvent.click(itemC);
 
-    // click the "Remove selected" action (not the global Clear)
     const removeBtn = screen.getByRole('button', { name: /Delete/i });
     fireEvent.click(removeBtn);
 
-    expect(mockSetFiles).toHaveBeenCalled();
-    const updater = mockSetFiles.mock.calls[0][0];
-    const prev = [
-      { file: a, url: 'blob:a', id: '1' },
-      { file: b, url: 'blob:b', id: '2' },
-      { file: c, url: 'blob:c', id: '3' },
-    ];
-    const result = applyUpdater(updater, prev);
-
-    expect(Array.isArray(result)).toBe(true);
-    expect(result.length).toBe(1);
-    expect(result[0].file).toBe(b);
+    expect(mockRemoveFiles).toHaveBeenCalledWith(['1', '3']);
   });
 
   it('uploads file when Share button is clicked', async () => {
     const file = new File(['data'], 'data.png', { type: 'image/png' });
 
-    vi.spyOn(store, 'useMediaStore').mockReturnValue({
-      files: [{ file }],
-      setFiles: mockSetFiles,
-      mode: 'media',
-      setMode: mockSetMode,
-      uploading: false,
-      setUploading: mockSetUploading,
-    } as any);
+    vi.spyOn(store, 'useMediaStore').mockReturnValue(
+      getMockStore({ files: [{ file, url: 'blob:1', id: '1' }] }) as any
+    );
 
-    // use fake timers to control the setTimeout in finally for setUploading(false)
     vi.useFakeTimers();
 
     render(<Homepage />);
@@ -175,7 +147,6 @@ describe('Homepage', () => {
     expect(mockSetUploading).toHaveBeenCalledWith(true);
     expect(client.LocalServer.post).toHaveBeenCalled();
 
-    // wait for the async operations to complete (LocalServer.post)
     await act(async () => {
       await Promise.resolve();
     });
