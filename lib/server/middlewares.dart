@@ -42,17 +42,6 @@ abstract class Middlewares {
     );
   }
 
-  static Middleware handleNotFound() {
-    return createMiddleware(
-      requestHandler: (Request request) {
-        if (request.method == 'OPTIONS') {
-          return null;
-        }
-        return null;
-      },
-    );
-  }
-
   static const _corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

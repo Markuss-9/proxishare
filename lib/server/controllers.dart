@@ -73,12 +73,7 @@ Future<Response> serveWebui(Request request) async {
     final mimeType = lookupMimeType(assetPath) ?? 'application/octet-stream';
     logger.debug("serveWebui mimeType $mimeType");
 
-    final headers = <String, String>{'Content-Type': mimeType};
-    if (!isIndex) {
-      headers['Cache-Control'] = 'public, max-age=2592000, immutable';
-    }
-
-    return Response.ok(data, headers: headers);
+    return Response.ok(data, headers: {'Content-Type': mimeType});
   } catch (e) {
     logger.error("serveWebui asset $assetPath gave error ${e.toString()}");
     return Response.notFound('Asset not found: $assetPath');
