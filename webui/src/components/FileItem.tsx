@@ -1,5 +1,6 @@
 import { cn, isImage, isVideo, isPdf, formatFileSize } from '@/lib/utils';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 type Props = {
   file: File;
@@ -15,15 +16,38 @@ export default React.memo(function FileItem({
   onRemove,
 }: Props) {
   const ext = file.name.split('.').pop()?.toUpperCase() ?? 'FILE';
+  const [isError, setError] = useState(false);
+
+  useEffect(() => {
+    setError(false);
+  }, [url]);
 
   const MediaMemoized = useMemo(() => {
     if (!url) return null;
     if (isImage(file.type)) {
       return (
-        <img src={url} alt={file.name} className="w-full h-full object-cover" />
+        <img
+          src={url}
+          alt={file.name}
+          loading="lazy"
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.opacity = '0';
+            setError(true);
+          }}
+        />
       );
     } else if (isVideo(file.type)) {
-      return <video src={url} className="w-full h-full object-cover" />;
+      return (
+        <video
+          src={url}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.opacity = '0';
+            setError(true);
+          }}
+        />
+      );
     } else {
       return null;
     }
@@ -36,9 +60,17 @@ export default React.memo(function FileItem({
         selected && 'ring-2 ring-indigo-400',
       ])}
     >
-      <div className="w-36 h-28 bg-gray-100 flex items-center justify-center">
+      <div className="relative w-36 h-28 bg-gray-100 flex items-center justify-center">
         {MediaMemoized}
-        {url && isPdf(file.type) && (
+        {isError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-red-500 bg-red-50 dark:bg-red-900/20">
+            <AlertTriangle className="w-6 h-6" />
+            <span className="text-[10px] mt-1 text-center px-1">
+              Failed to load
+            </span>
+          </div>
+        )}
+        {url && isPdf(file.type) && !isError && (
           <div className="w-full h-full flex items-center justify-center text-xs text-gray-600">
             PDF
           </div>
