@@ -101,7 +101,7 @@ export default function ControlPanel({ onAddFiles }: ControlPanelProps) {
   };
 
   return (
-    <div className="w-full lg:w-1/3 flex flex-col gap-4">
+    <div className="w-full md:w-1/3 flex flex-col gap-4">
       <div className="flex flex-col gap-3">
         <ModeToggle />
 
@@ -124,7 +124,7 @@ export default function ControlPanel({ onAddFiles }: ControlPanelProps) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+          className="w-full sm:w-auto px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
         >
           Choose Files
         </button>
@@ -164,11 +164,11 @@ export default function ControlPanel({ onAddFiles }: ControlPanelProps) {
             className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden [&>div]:transition-all [&>div]:duration-600 [&>div]:ease-out"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button
             onClick={handleShare}
             disabled={!files || files.length === 0 || uploading}
-            className="flex-1 transition-all duration-200"
+            className="w-full sm:w-auto sm:flex-1 transition-all duration-200"
           >
             {uploading ? (
               <span className="flex items-center gap-2">

@@ -1,11 +1,15 @@
 import { cn, isImage, isVideo, isPdf, formatFileSize } from '@/lib/utils';
-import React, { useMemo, useState, useEffect } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { AlertTriangle, X, Check, FileText, File, Trash2 } from 'lucide-react';
 
 type Props = {
   file: File;
   url: string;
   selected?: boolean;
+  selectionMode?: boolean;
+  onStartSelect?: () => void;
+  onMoveSelect?: () => void;
+  onOpen?: () => void;
   onRemove?: () => void;
 };
 
@@ -13,107 +17,208 @@ export default React.memo(function FileItem({
   file,
   url,
   selected,
+  selectionMode,
+  onStartSelect,
+  onMoveSelect,
+  onOpen,
   onRemove,
 }: Props) {
   const ext = file.name.split('.').pop()?.toUpperCase() ?? 'FILE';
   const [isError, setError] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const isSelectingRef = useRef(false);
 
   useEffect(() => {
     setError(false);
   }, [url]);
 
-  const MediaMemoized = useMemo(() => {
-    if (!url) return null;
-    if (isImage(file.type)) {
-      return (
-        <img
-          src={url}
-          alt={file.name}
-          loading="lazy"
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.opacity = '0';
-            setError(true);
-          }}
-        />
-      );
-    } else if (isVideo(file.type)) {
-      return (
-        <video
-          src={url}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.opacity = '0';
-            setError(true);
-          }}
-        />
-      );
-    } else {
-      return null;
+  const handleRemove = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (showRemoveConfirm) {
+        onRemove?.();
+        setShowRemoveConfirm(false);
+      } else {
+        setShowRemoveConfirm(true);
+        setTimeout(() => setShowRemoveConfirm(false), 3000);
+      }
+    },
+    [onRemove, showRemoveConfirm]
+  );
+
+  useEffect(() => {
+    if (showRemoveConfirm) {
+      const timer = setTimeout(() => setShowRemoveConfirm(false), 3000);
+      return () => clearTimeout(timer);
     }
-  }, [file.type, file.name, url]);
+  }, [showRemoveConfirm]);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (selectionMode) {
+        if (e.button !== 0) return;
+
+        isSelectingRef.current = true;
+        onStartSelect?.();
+
+        const handlePointerUp = () => {
+          isSelectingRef.current = false;
+          window.removeEventListener('pointerup', handlePointerUp);
+        };
+        window.addEventListener('pointerup', handlePointerUp);
+      }
+    },
+    [selectionMode, onStartSelect]
+  );
+
+  const handlePointerEnter = useCallback(() => {
+    if (selectionMode && isSelectingRef.current && onMoveSelect) {
+      onMoveSelect();
+    }
+  }, [selectionMode, onMoveSelect]);
+
+  const handleClick = useCallback(() => {
+    if (!selectionMode && onOpen) {
+      onOpen();
+    }
+  }, [selectionMode, onOpen]);
+
+  const getFileIcon = () => {
+    if (isPdf(file.type)) {
+      return <FileText className="w-10 h-10 text-red-500" />;
+    }
+    return <File className="w-10 h-10 text-gray-400" />;
+  };
 
   return (
     <div
-      className={cn([
-        'relative cursor-pointer rounded overflow-hidden border bg-white dark:bg-slate-900 hover:shadow-lg transition-shadow duration-150',
-        selected && 'ring-2 ring-indigo-400',
-      ])}
+      className={cn(
+        'group relative rounded-xl overflow-hidden border bg-white dark:bg-slate-900 transition-all duration-200',
+        'hover:shadow-lg hover:-translate-y-0.5',
+        selected &&
+          'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900',
+        selectionMode && 'cursor-pointer select-none touch-none'
+      )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onPointerDown={handlePointerDown}
+      onPointerEnter={handlePointerEnter}
+      onClick={handleClick}
     >
-      <div className="relative w-36 h-28 bg-gray-100 flex items-center justify-center">
-        {MediaMemoized}
+      <div className="relative w-full aspect-[4/3] bg-gray-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
+        {url && (isImage(file.type) || isVideo(file.type)) && !isError && (
+          <>
+            {isImage(file.type) ? (
+              <img
+                src={url}
+                alt={file.name}
+                loading="lazy"
+                className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  setError(true);
+                }}
+              />
+            ) : (
+              <video
+                src={url}
+                className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  setError(true);
+                }}
+              />
+            )}
+          </>
+        )}
+
         {isError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-red-500 bg-red-50 dark:bg-red-900/20">
-            <AlertTriangle className="w-6 h-6" />
-            <span className="text-[10px] mt-1 text-center px-1">
+            <AlertTriangle className="w-8 h-8" />
+            <span className="text-xs mt-2 text-center px-2 font-medium">
               Failed to load
             </span>
           </div>
         )}
+
         {url && isPdf(file.type) && !isError && (
-          <div className="w-full h-full flex items-center justify-center text-xs text-gray-600">
-            PDF
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-50 dark:bg-red-900/10">
+            <FileText className="w-12 h-12 text-red-500 mb-2" />
+            <span className="text-xs font-medium text-red-600 dark:text-red-400">
+              PDF
+            </span>
           </div>
         )}
 
-        {!url && <div className="text-gray-400">Loading…</div>}
+        {!url && (
+          <div className="text-gray-400 flex flex-col items-center gap-2">
+            <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" />
+            <span className="text-xs">Loading...</span>
+          </div>
+        )}
 
         {!isImage(file.type) &&
           !isVideo(file.type) &&
           !isPdf(file.type) &&
           url && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-sm text-gray-600 bg-white/60">
-              <div className="text-2xl">📄</div>
-              <div className="text-xs mt-1">{ext}</div>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-slate-800">
+              {getFileIcon()}
+              <span className="text-xs mt-2 font-medium text-gray-600 dark:text-gray-300">
+                {ext}
+              </span>
             </div>
           )}
+
+        {selectionMode && (
+          <div
+            className={cn(
+              'absolute top-2 left-2 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all duration-200',
+              selected
+                ? 'bg-indigo-500 border-indigo-500'
+                : 'bg-white/90 dark:bg-slate-800/90 border-gray-300 dark:border-gray-600',
+              isHovered && !selected && 'border-indigo-400'
+            )}
+          >
+            {selected && <Check className="w-4 h-4 text-white" />}
+          </div>
+        )}
+
+        {onRemove && !selectionMode && (
+          <button
+            onClick={handleRemove}
+            aria-label={`Remove ${file.name}`}
+            className={cn(
+              'absolute top-2 right-2 p-1.5 rounded-lg transition-all duration-200 z-10',
+              showRemoveConfirm
+                ? 'bg-red-500 text-white animate-pulse'
+                : 'bg-white/90 dark:bg-slate-800/90 text-gray-600 hover:bg-red-500 hover:text-white opacity-0 group-hover:opacity-100'
+            )}
+          >
+            {showRemoveConfirm ? (
+              <Trash2 className="w-4 h-4" />
+            ) : (
+              <X className="w-4 h-4" />
+            )}
+          </button>
+        )}
       </div>
 
-      <div className="p-2 text-xs text-left w-36">
-        <div className="truncate font-medium">{file.name}</div>
-        <div className="text-[11px] text-gray-400">
-          {formatFileSize(file.size)}
-        </div>
-      </div>
-
-      {onRemove && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          aria-label={`Remove ${file.name}`}
-          className="absolute top-1 right-1 text-xs px-1 py-0.5 bg-white/80 rounded text-red-600 hover:bg-red-50"
+      <div className="p-3 text-sm text-left w-full bg-white dark:bg-slate-900">
+        <div
+          className="truncate font-medium text-gray-900 dark:text-gray-100"
+          title={file.name}
         >
-          ✕
-        </button>
-      )}
-
-      {selected && (
-        <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-indigo-600 text-white text-[11px] flex items-center justify-center">
-          ✓
+          {file.name}
         </div>
-      )}
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5">
+          <span>{formatFileSize(file.size)}</span>
+          <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+          <span>{ext}</span>
+        </div>
+      </div>
     </div>
   );
 });

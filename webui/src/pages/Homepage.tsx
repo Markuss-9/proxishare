@@ -141,7 +141,7 @@ export default function Homepage() {
           </div>
 
           <div
-            className="p-6 flex flex-col lg:flex-row gap-8 relative"
+            className="p-4 md:p-6 flex flex-col md:flex-row gap-6 md:gap-8 relative"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
