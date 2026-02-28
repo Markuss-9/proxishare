@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { FileEnriched } from '@/store';
 import { isImage, isVideo, isPdf } from '@/lib/utils';
+import { useImageZoom } from '@/hooks/useImageZoom';
 import { AlertTriangle, X } from 'lucide-react';
 
 type Props = {
@@ -10,11 +11,14 @@ type Props = {
 
 export default function FilePreviewModal({ file, onClose }: Props) {
   const [isError, setError] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(
-    null
-  );
+  const {
+    zoom,
+    position,
+    dragStart,
+    handleMouseDown,
+    reset,
+    attachWheelListener,
+  } = useImageZoom();
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -25,66 +29,26 @@ export default function FilePreviewModal({ file, onClose }: Props) {
     [onClose]
   );
 
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom((prev) => Math.min(Math.max(prev + delta, 0.25), 4));
-  }, []);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setDragStart({ x: e.clientX, y: e.clientY });
-  }, []);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (dragStart) {
-        const zoomNormalized = Math.max(1, zoom);
-        const deltaX = (e.clientX - dragStart.x) / zoomNormalized;
-        const deltaY = (e.clientY - dragStart.y) / zoomNormalized;
-        setPosition((prev) => ({
-          x: prev.x + deltaX,
-          y: prev.y + deltaY,
-        }));
-        setDragStart({ x: e.clientX, y: e.clientY });
-      }
-    },
-    [dragStart, zoom]
-  );
-
-  const handleMouseUp = useCallback(() => {
-    setDragStart(null);
-  }, []);
-
-  useEffect(() => {
-    if (dragStart) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [dragStart, handleMouseMove, handleMouseUp]);
-
   useEffect(() => {
     setError(false);
-    setZoom(1);
-    setPosition({ x: 0, y: 0 });
-  }, [file]);
+    reset();
+  }, [file, reset]);
 
   useEffect(() => {
+    let cleanupWheel: (() => void) | undefined;
     if (file) {
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
-      document.addEventListener('wheel', handleWheel, { passive: false });
+      if (isImage(file.file.type)) {
+        cleanupWheel = attachWheelListener();
+      }
     }
     return () => {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('wheel', handleWheel);
+      cleanupWheel?.();
     };
-  }, [file, handleKeyDown, handleWheel]);
+  }, [file, handleKeyDown, attachWheelListener]);
 
   if (!file) return null;
 
@@ -96,7 +60,7 @@ export default function FilePreviewModal({ file, onClose }: Props) {
       onClick={onClose}
     >
       <button
-        className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm"
+        className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors backdrop-blur-sm cursor-pointer"
         onClick={onClose}
         aria-label="Close preview"
       >
@@ -106,9 +70,14 @@ export default function FilePreviewModal({ file, onClose }: Props) {
       <div
         className="flex-1 flex items-center justify-center p-4 select-none"
         onClick={(e) => e.stopPropagation()}
-        onMouseDown={handleMouseDown}
+        onMouseDown={isImage(file.file.type) ? handleMouseDown : undefined}
         style={{
-          cursor: dragStart ? 'grabbing' : 'grab',
+          cursor:
+            isImage(file.file.type) && !isError
+              ? dragStart
+                ? 'grabbing'
+                : 'grab'
+              : 'default',
           userSelect: 'none',
         }}
       >

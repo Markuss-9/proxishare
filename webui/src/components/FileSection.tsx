@@ -30,37 +30,6 @@ export default function FileSection({
     }
   }, [isDragging]);
 
-  const toggleSelectIndex = useCallback((idx: FileId) => {
-    setSelectedIndices((prev) => {
-      const s = new Set(prev);
-      if (s.has(idx)) s.delete(idx);
-      else s.add(idx);
-      return s;
-    });
-  }, []);
-
-  const handleStartSelect = useCallback(
-    (idx: FileId) => {
-      if (!selectionMode) return;
-      isSelectingRef.current = true;
-      setIsDragging(true);
-      lastSelectedRef.current = idx;
-      toggleSelectIndex(idx);
-    },
-    [selectionMode, toggleSelectIndex]
-  );
-
-  const handleMoveSelect = useCallback(
-    (idx: FileId) => {
-      if (!isSelectingRef.current || !selectionMode) return;
-      if (idx === lastSelectedRef.current) return;
-
-      lastSelectedRef.current = idx;
-      toggleSelectIndex(idx);
-    },
-    [selectionMode, toggleSelectIndex]
-  );
-
   const handleEndSelect = useCallback(() => {
     isSelectingRef.current = false;
     setIsDragging(false);
@@ -170,8 +139,6 @@ export default function FileSection({
         files={files}
         selectionMode={selectionMode}
         selectedIndices={selectedIndices}
-        onStartSelect={handleStartSelect}
-        onMoveSelect={handleMoveSelect}
         onOpen={onPreview}
         onRemove={(idx) => onRemoveFiles([idx])}
       />

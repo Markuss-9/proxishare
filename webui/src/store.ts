@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { nanoid } from 'nanoid';
 
 export type FileId = string;
 export interface FileEnriched {
@@ -7,8 +8,6 @@ export interface FileEnriched {
   id: FileId;
   progress?: number;
 }
-
-export type ModeOptions = 'media' | 'all' | 'folder';
 
 const revokeAllUrls = (files: FileEnriched[]) => {
   files.forEach((f) => URL.revokeObjectURL(f.url));
@@ -19,12 +18,11 @@ type MediaState = {
   setFiles: (
     files: FileEnriched[] | ((prev: FileEnriched[]) => FileEnriched[])
   ) => void;
-  addFiles: (newFiles: FileEnriched[]) => void;
+  addFiles: (newFiles: File[]) => void;
+  addFilesEnriched: (newFiles: FileEnriched[]) => void;
   removeFiles: (ids: FileId[]) => void;
   clearFiles: () => void;
   updateFileProgress: (id: FileId, progress: number) => void;
-  mode: ModeOptions;
-  setMode: (m: ModeOptions) => void;
   uploading: boolean;
   setUploading: (state: boolean) => void;
 };
@@ -37,6 +35,25 @@ export const useMediaStore = create<MediaState>((set) => ({
       return { files: newFiles };
     }),
   addFiles: (newFiles) =>
+    set((state) => {
+      const existingNames = new Set(
+        state.files.map((f) => `${f.file.name}-${f.file.size}`)
+      );
+      const toAdd: FileEnriched[] = [];
+      for (const file of newFiles) {
+        const key = `${file.name}-${file.size}`;
+        if (!existingNames.has(key)) {
+          existingNames.add(key);
+          toAdd.push({
+            file,
+            url: URL.createObjectURL(file),
+            id: nanoid(),
+          });
+        }
+      }
+      return { files: [...state.files, ...toAdd] };
+    }),
+  addFilesEnriched: (newFiles) =>
     set((state) => ({ files: [...state.files, ...newFiles] })),
   removeFiles: (ids) =>
     set((state) => {
@@ -53,8 +70,6 @@ export const useMediaStore = create<MediaState>((set) => ({
     set((state) => ({
       files: state.files.map((f) => (f.id === id ? { ...f, progress } : f)),
     })),
-  mode: 'media',
-  setMode: (m) => set({ mode: m }),
   uploading: false,
   setUploading: (state) => set({ uploading: state }),
 }));

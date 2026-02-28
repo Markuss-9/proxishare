@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useMediaStore, type FileId, type FileEnriched } from '@/store';
+import { useState, useEffect, useCallback } from 'react';
+import { useMediaStore, type FileId } from '@/store';
 import FilePreviewModal from '@/components/FilePreviewModal';
 import ControlPanel from '@/components/ControlPanel';
 import FileSection from '@/components/FileSection';
 import { Sun, Moon, Upload, Wifi, WifiOff, Loader2 } from 'lucide-react';
-import { nanoid } from 'nanoid';
 import { useTheme } from '@/hooks/useTheme';
 import { useServerStatus } from '@/hooks/useServerStatus';
 
@@ -42,35 +41,17 @@ export default function Homepage() {
   const [isDragging, setIsDragging] = useState(false);
   const { isDark, toggleTheme: toggleDarkMode } = useTheme();
 
-  const filesRef = useRef(files);
-  filesRef.current = files;
-
   useEffect(() => {
     return () => {
-      filesRef.current?.forEach((f) => URL.revokeObjectURL(f.url));
+      files.forEach((f) => URL.revokeObjectURL(f.url));
     };
-  }, []);
+  }, [files]);
 
   const handleAddFiles = useCallback(
     (newFiles: File[]) => {
-      const toAdd: FileEnriched[] = [];
-      newFiles.forEach((f) => {
-        const exists = (files ?? []).some(
-          (e) => e.file.name === f.name && e.file.size === f.size
-        );
-        if (!exists) {
-          toAdd.push({
-            file: f,
-            url: URL.createObjectURL(f),
-            id: nanoid(),
-          });
-        }
-      });
-      if (toAdd.length > 0) {
-        addFiles(toAdd);
-      }
+      addFiles(newFiles);
     },
-    [files, addFiles]
+    [addFiles]
   );
 
   const handleRemoveFiles = useCallback(

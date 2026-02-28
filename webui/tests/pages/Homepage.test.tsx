@@ -66,13 +66,7 @@ describe('Homepage', () => {
     fireEvent.change(fileInput, { target: { files: [file] } });
 
     expect(mockAddFiles).toHaveBeenCalled();
-    expect(mockAddFiles).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          file: file,
-        }),
-      ])
-    );
+    expect(mockAddFiles).toHaveBeenCalledWith([file]);
   });
 
   it('appends files when selecting additional files', () => {
@@ -92,7 +86,7 @@ describe('Homepage', () => {
     expect(mockAddFiles).toHaveBeenCalled();
     const calledWith = mockAddFiles.mock.calls[0][0];
     expect(calledWith).toHaveLength(1);
-    expect(calledWith[0].file).toBe(file2);
+    expect(calledWith[0]).toBe(file2);
   });
 
   it('selects and removes multiple files when in selection mode', () => {
@@ -117,10 +111,12 @@ describe('Homepage', () => {
     });
     fireEvent.click(selectBtn);
 
-    const itemA = screen.getByText(/a.png/i);
-    const itemC = screen.getByText(/c.png/i);
-    fireEvent.click(itemA);
-    fireEvent.click(itemC);
+    const items = screen.getAllByText(/\.png$/);
+    const itemA = items[0];
+    const itemC = items[2];
+
+    fireEvent.pointerDown(itemA);
+    fireEvent.pointerDown(itemC);
 
     const removeBtn = screen.getByRole('button', { name: /Delete/i });
     fireEvent.click(removeBtn);

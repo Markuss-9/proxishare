@@ -1,5 +1,5 @@
 import { cn, isImage, isVideo, isPdf, formatFileSize } from '@/lib/utils';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, X, Check, FileText, File, Trash2 } from 'lucide-react';
 
 type Props = {
@@ -7,8 +7,6 @@ type Props = {
   url: string;
   selected?: boolean;
   selectionMode?: boolean;
-  onStartSelect?: () => void;
-  onMoveSelect?: () => void;
   onOpen?: () => void;
   onRemove?: () => void;
 };
@@ -18,8 +16,6 @@ export default React.memo(function FileItem({
   url,
   selected,
   selectionMode,
-  onStartSelect,
-  onMoveSelect,
   onOpen,
   onRemove,
 }: Props) {
@@ -27,7 +23,6 @@ export default React.memo(function FileItem({
   const [isError, setError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const isSelectingRef = useRef(false);
 
   useEffect(() => {
     setError(false);
@@ -54,30 +49,6 @@ export default React.memo(function FileItem({
     }
   }, [showRemoveConfirm]);
 
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (selectionMode) {
-        if (e.button !== 0) return;
-
-        isSelectingRef.current = true;
-        onStartSelect?.();
-
-        const handlePointerUp = () => {
-          isSelectingRef.current = false;
-          window.removeEventListener('pointerup', handlePointerUp);
-        };
-        window.addEventListener('pointerup', handlePointerUp);
-      }
-    },
-    [selectionMode, onStartSelect]
-  );
-
-  const handlePointerEnter = useCallback(() => {
-    if (selectionMode && isSelectingRef.current && onMoveSelect) {
-      onMoveSelect();
-    }
-  }, [selectionMode, onMoveSelect]);
-
   const handleClick = useCallback(() => {
     if (!selectionMode && onOpen) {
       onOpen();
@@ -94,20 +65,17 @@ export default React.memo(function FileItem({
   return (
     <div
       className={cn(
-        'group relative rounded-xl overflow-hidden border bg-white dark:bg-slate-900 transition-all duration-200',
+        'group relative rounded-xl overflow-hidden border bg-white dark:bg-slate-900 transition-all duration-200 cursor-pointer select-none touch-none',
         'hover:shadow-lg hover:-translate-y-0.5',
         selected &&
-          'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900',
-        selectionMode && 'cursor-pointer select-none touch-none'
+          'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900'
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onPointerDown={handlePointerDown}
-      onPointerEnter={handlePointerEnter}
       onClick={handleClick}
     >
-      <div className="relative w-full aspect-[4/3] bg-gray-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+      <div className="relative w-full aspect-4/3 bg-gray-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-linear-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
         {url && (isImage(file.type) || isVideo(file.type)) && !isError && (
           <>
