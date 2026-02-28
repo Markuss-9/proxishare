@@ -10,6 +10,11 @@ type Props = {
 
 export default function FilePreviewModal({ file, onClose }: Props) {
   const [isError, setError] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(
+    null
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -20,20 +25,66 @@ export default function FilePreviewModal({ file, onClose }: Props) {
     [onClose]
   );
 
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom((prev) => Math.min(Math.max(prev + delta, 0.25), 4));
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setDragStart({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (dragStart) {
+        const zoomNormalized = Math.max(1, zoom);
+        const deltaX = (e.clientX - dragStart.x) / zoomNormalized;
+        const deltaY = (e.clientY - dragStart.y) / zoomNormalized;
+        setPosition((prev) => ({
+          x: prev.x + deltaX,
+          y: prev.y + deltaY,
+        }));
+        setDragStart({ x: e.clientX, y: e.clientY });
+      }
+    },
+    [dragStart, zoom]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setDragStart(null);
+  }, []);
+
+  useEffect(() => {
+    if (dragStart) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragStart, handleMouseMove, handleMouseUp]);
+
   useEffect(() => {
     setError(false);
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
   }, [file]);
 
   useEffect(() => {
     if (file) {
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('wheel', handleWheel, { passive: false });
     }
     return () => {
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('wheel', handleWheel);
     };
-  }, [file, handleKeyDown]);
+  }, [file, handleKeyDown, handleWheel]);
 
   if (!file) return null;
 
@@ -53,8 +104,13 @@ export default function FilePreviewModal({ file, onClose }: Props) {
       </button>
 
       <div
-        className="flex-1 flex items-center justify-center p-4"
+        className="flex-1 flex items-center justify-center p-4 select-none"
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={handleMouseDown}
+        style={{
+          cursor: dragStart ? 'grabbing' : 'grab',
+          userSelect: 'none',
+        }}
       >
         {isError && (
           <div className="flex flex-col items-center justify-center text-red-500">
@@ -66,7 +122,10 @@ export default function FilePreviewModal({ file, onClose }: Props) {
           <img
             src={file.url}
             alt={file.file.name}
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain select-none"
+            style={{
+              transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+            }}
             onError={() => setError(true)}
           />
         )}
@@ -74,7 +133,7 @@ export default function FilePreviewModal({ file, onClose }: Props) {
           <video
             src={file.url}
             controls
-            className="max-w-full max-h-full"
+            className="max-w-full max-h-full select-none"
             onError={() => setError(true)}
           />
         )}
@@ -82,7 +141,7 @@ export default function FilePreviewModal({ file, onClose }: Props) {
           <iframe
             src={file.url}
             title={file.file.name}
-            className="w-full h-full max-w-6xl rounded-lg shadow-2xl"
+            className="w-full h-full max-w-6xl rounded-lg shadow-2xl select-none"
           />
         )}
 
