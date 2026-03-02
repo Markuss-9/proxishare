@@ -4,5 +4,17 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+
+  <!-- Allow incoming connections (required to run a server) -->
+  <key>com.apple.security.network.server</key>
+  <true/>
+
+  <!-- Allow outgoing connections (clients, APIs, etc.) -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+
+  <!-- Allow communication on the local network (required when other LAN devices call your server) -->
+  <key>com.apple.security.network.local</key>
+  <true/>
 </dict>
 </plist>

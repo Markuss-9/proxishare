@@ -44,9 +44,12 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-
 /assets/webui/*
 !/assets/webui/.gitkeep
 
 # windows installers via inno setup
 installer
+
+# FVM Version Cache
+.fvm/
+dist
