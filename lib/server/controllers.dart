@@ -7,11 +7,16 @@ import 'package:proxishare/logger.dart';
 import 'package:proxishare/server/upload.dart';
 import 'package:proxishare/server/local_server.dart';
 import 'package:proxishare/server/events.dart';
+import 'package:proxishare/server/upload_settings.dart';
 import 'package:shelf/shelf.dart';
 
 Future<String> get _localPath async {
   final dir = await getApplicationDocumentsDirectory();
   return dir.path;
+}
+
+bool _isImageOrVideo(String mime) {
+  return mime.startsWith('image/') || mime.startsWith('video/');
 }
 
 Future<Response> serveTestFile(Request request) async {
@@ -25,33 +30,71 @@ Future<Response> serveTestFile(Request request) async {
   return Response.ok(bytes);
 }
 
-Future<Response> serveUploadMedia(Request request) async {
+Future<Response> serveUpload(Request request) async {
   final path = await _localPath;
+  final settings = UploadSettings.instance;
+
   try {
-    final saved = await handleShelfFileUpload(request, "$path/ProxiShare");
-    if (saved.isNotEmpty) {
-      final files = saved.map((m) => UploadedFile.fromMap(m)).toList();
-      LocalServer.current?.notifyEvent(UploadMediaEvent(files));
+    final saved = await handleShelfFileUpload(request, '');
+    if (saved.isEmpty) {
+      return Response.ok('No files uploaded');
     }
+
+    final files = saved.map((m) => UploadedFile.fromMap(m)).toList();
+    final hasMedia = files.any((f) => _isImageOrVideo(f.mime));
+
+    if (hasMedia) {
+      final mediaFiles = files.where((f) => _isImageOrVideo(f.mime)).toList();
+      final otherFiles = files.where((f) => !_isImageOrVideo(f.mime)).toList();
+
+      final saveToGallery = settings.saveMediaToGallery;
+      final mediaSaveDir = saveToGallery
+          ? '$path/${settings.galleryDestination}'
+          : '$path/${settings.filesDestination}';
+
+      logger.debug(
+        "path $path - mediaSaveDir $mediaSaveDir - saveToGallery $saveToGallery - settings $settings",
+      );
+
+      await _moveFiles(mediaFiles, mediaSaveDir);
+
+      if (saveToGallery) {
+        LocalServer.current?.notifyEvent(UploadMediaEvent(mediaFiles));
+      } else {
+        LocalServer.current?.notifyEvent(UploadFilesEvent(mediaFiles));
+      }
+
+      if (otherFiles.isNotEmpty) {
+        final saveDir = '$path/${settings.filesDestination}';
+        await _moveFiles(otherFiles, saveDir);
+        LocalServer.current?.notifyEvent(UploadFilesEvent(otherFiles));
+      }
+    } else {
+      final saveDir = '$path/${settings.filesDestination}';
+      await _moveFiles(files, saveDir);
+      LocalServer.current?.notifyEvent(UploadFilesEvent(files));
+    }
+
     return Response.ok('Uploaded ${saved.length} file(s)');
   } catch (e, st) {
-    logger.error('serveUploadMedia failed: $e\n$st');
+    logger.error('serveUpload failed: $e\n$st');
     return Response.internalServerError(body: 'Upload failed: $e');
   }
 }
 
-Future<Response> serveUploadFiles(Request request) async {
-  final path = await _localPath;
-  try {
-    final saved = await handleShelfFileUpload(request, "$path/ProxiShare");
-    if (saved.isNotEmpty) {
-      final files = saved.map((m) => UploadedFile.fromMap(m)).toList();
-      LocalServer.current?.notifyEvent(UploadFilesEvent(files));
-    }
-    return Response.ok('Uploaded ${saved.length} file(s)');
-  } catch (e, st) {
-    logger.error('serveUploadFiles failed: $e\n$st');
-    return Response.internalServerError(body: 'Upload failed: $e');
+Future<void> _moveFiles(List<UploadedFile> files, String saveDir) async {
+  final dir = Directory(saveDir);
+  if (!await dir.exists()) {
+    await dir.create(recursive: true);
+  }
+
+  for (final file in files) {
+    final tmpFile = File(file.path);
+    final destPath = '$saveDir/${file.filename}';
+    final destFile = File(destPath);
+    await tmpFile.copy(destFile.path);
+    await tmpFile.delete();
+    file.path = destPath;
   }
 }
 

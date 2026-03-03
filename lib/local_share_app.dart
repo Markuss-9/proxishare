@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:proxishare/components/toast.dart';
+import 'package:proxishare/components/upload_settings_widget.dart';
 import 'package:proxishare/server/local_server.dart';
 import 'package:proxishare/server/events.dart';
 import 'package:proxishare/components/upload_dialog.dart';
 import 'package:proxishare/logger.dart';
+import 'package:proxishare/server/upload_settings.dart';
 
 const commonPorts = [8080, 5173, 3000];
 
@@ -23,13 +25,26 @@ class LocalShareAppState extends State<LocalShareApp> {
 
   @override
   void initState() {
+    UploadSettings.init();
     super.initState();
   }
 
   void handleServerEvents(event) {
     logger.info("SERVER EVENT: $event");
+    final settings = UploadSettings.instance;
     if (event is UploadMediaEvent) {
-      showUploadDialog(context, event.files);
+      showUploadDialog(
+        context,
+        event.files,
+        destination: settings.defaultTarget,
+      );
+    } else if (event is UploadFilesEvent) {
+      showUploadDialog(
+        context,
+        event.files,
+        destination: settings.defaultTarget,
+        folder: settings.defaultFolder,
+      );
     } else {
       logger.warn("Unhandled server event: $event");
     }
@@ -140,6 +155,16 @@ class LocalShareAppState extends State<LocalShareApp> {
                   }
                 },
                 child: const Text('Export logs'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (context) => const UploadSettingsWidget(),
+                  );
+                },
+                child: const Text('Upload Settings'),
               ),
             ],
           );

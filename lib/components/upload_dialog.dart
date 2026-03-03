@@ -7,12 +7,26 @@ import 'package:proxishare/server/events.dart';
 import 'package:proxishare/components/toast.dart';
 import 'package:proxishare/logger.dart';
 import 'package:proxishare/services/notifications/notification_service.dart';
+import 'package:proxishare/server/upload_settings.dart';
 
 Future<void> showUploadDialog(
   BuildContext context,
-  List<UploadedFile> files,
-) async {
+  List<UploadedFile> files, {
+  UploadDestination? destination,
+  String? folder,
+}) async {
   if (!context.mounted) return;
+
+  final settings = await UploadSettings.init();
+  final defaultTarget = settings.defaultTarget;
+  final defaultFolder = settings.defaultFolder;
+
+  final showDestination = destination ?? defaultTarget;
+  logger.debug(
+    "Upload settings defaultFolder $defaultFolder - defaultTarget $defaultTarget - destination $destination - showDestination $showDestination",
+  );
+
+  final showFolder = folder ?? defaultFolder;
 
   final fileNames = files.map((f) => f.filename);
 
@@ -24,11 +38,31 @@ Future<void> showUploadDialog(
         logger.error('Failed to show notification', error: e);
       });
 
+  if (!context.mounted) return;
+
+  final destinationText = showDestination == UploadDestination.gallery
+      ? 'Gallery'
+      : 'Files${showFolder != null ? '/$showFolder' : ''}';
+
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('New upload received'),
-      content: Text('Files: ${fileNames.join(', ')}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Files: ${fileNames.join(', ')}'),
+          const SizedBox(height: 8),
+          Text(
+            'Saved to: $destinationText',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
       actions: [
         TextButton(
           onPressed: () async {
@@ -46,7 +80,7 @@ Future<void> showUploadDialog(
         ),
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
+          child: const Text('Close'),
         ),
       ],
     ),

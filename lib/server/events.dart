@@ -2,10 +2,12 @@ import 'package:flutter/foundation.dart';
 
 enum ServerEventType { upload }
 
+enum UploadDestination { gallery, files }
+
 /// Simple typed model representing an uploaded file.
 class UploadedFile {
   final String filename;
-  final String path;
+  String path;
   final String mime;
   final int size;
 
