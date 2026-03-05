@@ -8,6 +8,7 @@ type Props = {
   selected?: boolean;
   selectionMode?: boolean;
   onOpen?: () => void;
+  onSelect?: () => void;
   onRemove?: () => void;
 };
 
@@ -17,6 +18,7 @@ export default React.memo(function FileItem({
   selected,
   selectionMode,
   onOpen,
+  onSelect,
   onRemove,
 }: Props) {
   const ext = file.name.split('.').pop()?.toUpperCase() ?? 'FILE';
@@ -50,10 +52,12 @@ export default React.memo(function FileItem({
   }, [showRemoveConfirm]);
 
   const handleClick = useCallback(() => {
-    if (!selectionMode && onOpen) {
+    if (selectionMode && onSelect) {
+      onSelect();
+    } else if (!selectionMode && onOpen) {
       onOpen();
     }
-  }, [selectionMode, onOpen]);
+  }, [selectionMode, onSelect, onOpen]);
 
   const getFileIcon = () => {
     if (isPdf(file.type)) {

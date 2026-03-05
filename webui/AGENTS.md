@@ -31,7 +31,9 @@ npm run test         # Run all tests in watch mode
 npm run test -- --run           # Run all tests once (no watch)
 npm run test -- tests/pages/Homepage.test.tsx  # Run single test file
 npm run test -- -t "test name"   # Run tests matching a pattern
-npm run test -- --coverage       # Run tests with coverage report
+### Coverage
+
+Agents should read coverage data from `coverage/coverage-final.json`. This JSON file contains structured coverage information including files, covered/uncovered lines, branches, and functions.
 ```
 
 ---

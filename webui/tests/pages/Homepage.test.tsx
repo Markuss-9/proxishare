@@ -4,10 +4,19 @@ import Homepage from '@/pages/Homepage';
 import * as store from '@/store';
 import * as client from '@/client';
 
+const mockToggleTheme = vi.fn();
+
 vi.mock('@/hooks/useServerStatus', () => ({
   useServerStatus: () => ({
     status: 'connected',
     checkConnection: vi.fn(),
+  }),
+}));
+
+vi.mock('@/hooks/useTheme', () => ({
+  useTheme: () => ({
+    isDark: false,
+    toggleTheme: mockToggleTheme,
   }),
 }));
 
@@ -21,6 +30,7 @@ describe('Homepage', () => {
 
   beforeEach(() => {
     vi.spyOn(client.LocalServer, 'post').mockResolvedValue({ data: 'ok' });
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -115,8 +125,8 @@ describe('Homepage', () => {
     const itemA = items[0];
     const itemC = items[2];
 
-    fireEvent.pointerDown(itemA);
-    fireEvent.pointerDown(itemC);
+    fireEvent.click(itemA);
+    fireEvent.click(itemC);
 
     const removeBtn = screen.getByRole('button', { name: /Delete/i });
     fireEvent.click(removeBtn);
@@ -152,5 +162,29 @@ describe('Homepage', () => {
     expect(mockSetUploading).toHaveBeenCalledWith(false);
 
     vi.useRealTimers();
+  });
+
+  it('shows drag overlay when dragging over drop zone', () => {
+    vi.spyOn(store, 'useMediaStore').mockReturnValue(getMockStore() as any);
+
+    render(<Homepage />);
+
+    const dropZone = screen.getByText(/Local Media Share/);
+    fireEvent.dragOver(dropZone);
+
+    expect(screen.getByText(/Drop files here/)).toBeInTheDocument();
+  });
+
+  it('toggles dark mode when toggle button is clicked', () => {
+    vi.spyOn(store, 'useMediaStore').mockReturnValue(getMockStore() as any);
+
+    render(<Homepage />);
+
+    const toggleButton = screen.getByRole('button', {
+      name: /toggle dark mode/i,
+    });
+    fireEvent.click(toggleButton);
+
+    expect(mockToggleTheme).toHaveBeenCalled();
   });
 });

@@ -66,6 +66,18 @@ export default function FileSection({
     setSelectedIndices(new Set(files.map((f) => f.id)));
   }, [files]);
 
+  const toggleSelect = useCallback((id: FileId) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
   if (!files || files.length === 0) {
     return (
       <div className="w-full md:w-2/3 flex items-center justify-center min-h-[200px] sm:min-h-96 text-gray-400 dark:text-gray-500">
@@ -140,6 +152,7 @@ export default function FileSection({
         selectionMode={selectionMode}
         selectedIndices={selectedIndices}
         onOpen={onPreview}
+        onSelect={toggleSelect}
         onRemove={(idx) => onRemoveFiles([idx])}
       />
     </div>

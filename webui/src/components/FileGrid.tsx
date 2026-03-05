@@ -7,6 +7,7 @@ type Props = {
   selectedIndices?: Set<FileId>;
   onOpen?: (idx: FileId) => void;
   onRemove?: (idx: FileId) => void;
+  onSelect?: (idx: FileId) => void;
 };
 
 export default function FileGrid({
@@ -15,6 +16,7 @@ export default function FileGrid({
   selectedIndices,
   onOpen,
   onRemove,
+  onSelect,
 }: Props) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
@@ -26,6 +28,7 @@ export default function FileGrid({
           selected={selectedIndices?.has(f.id)}
           selectionMode={selectionMode}
           onOpen={() => onOpen?.(f.id)}
+          onSelect={selectionMode ? () => onSelect?.(f.id) : undefined}
           onRemove={
             !selectionMode
               ? () => {
