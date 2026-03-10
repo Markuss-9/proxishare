@@ -22,10 +22,7 @@ class App extends StatelessWidget {
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: ThemeMode.system,
-      home: Scaffold(
-        appBar: AppBar(title: const Center(child: Text('ProxiShare'))),
-        body: Center(child: LocalShareApp()),
-      ),
+      home: Scaffold(body: Center(child: LocalShareApp())),
     );
   }
 }
