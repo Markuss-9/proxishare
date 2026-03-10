@@ -9,12 +9,10 @@ import 'package:proxishare/logger.dart';
 import 'package:proxishare/services/notifications/notification_service.dart';
 import 'package:proxishare/server/upload_settings.dart';
 
-Future<void> showUploadDialog(
+Future<void> showFilesUploadDialog(
   BuildContext context,
-  List<UploadedFile> files, {
-  UploadDestination? destination,
-  String? folder,
-}) async {
+  List<UploadedFile> files,
+) async {
   if (!context.mounted) return;
 
   final settings = await UploadSettings.init();
@@ -37,14 +35,13 @@ Future<void> showUploadDialog(
 
     if (!context.mounted) return;
 
-    final showFolder = folder ?? filesDest;
-    final destinationText =
-        'Files${showFolder.isNotEmpty ? '/$showFolder' : ''}';
+    final defaultFolder = await settings.getFilesDestinationWithDefault();
 
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('New upload received'),
+        title: const Text('New files received'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,7 +49,7 @@ Future<void> showUploadDialog(
             Text('Files: ${fileNames.join(', ')}'),
             const SizedBox(height: 8),
             Text(
-              'Saved to: $destinationText',
+              'Default: $defaultFolder',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w500,
@@ -64,16 +61,21 @@ Future<void> showUploadDialog(
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-              await _saveToGallery(context, files);
+              final customPath = await FilePicker.platform.getDirectoryPath(
+                dialogTitle: 'Select folder',
+              );
+              if (customPath != null && context.mounted) {
+                await _saveMediaToFolder(context, files, customPath);
+              }
             },
-            child: const Text('Save to gallery'),
+            child: const Text('Choose folder'),
           ),
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-              await _saveToFolder(context, files);
+              await _saveMediaToFolder(context, files, defaultFolder);
             },
-            child: const Text('Save to folder'),
+            child: const Text('Save to default'),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -83,6 +85,7 @@ Future<void> showUploadDialog(
       ),
     );
   } else {
+    if (!context.mounted) return;
     await _showSaveOptionsDialog(context, files);
   }
 }
@@ -101,8 +104,10 @@ Future<void> _showSaveOptionsDialog(
         logger.error('Failed to show notification', error: e);
       });
 
-  if (!context.mounted) return;
+  final settings = await UploadSettings.init();
+  final defaultFolder = await settings.getFilesDestinationWithDefault();
 
+  if (!context.mounted) return;
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -116,16 +121,21 @@ Future<void> _showSaveOptionsDialog(
         TextButton(
           onPressed: () async {
             Navigator.of(ctx).pop();
-            await _saveToGallery(context, files);
+            final customPath = await FilePicker.platform.getDirectoryPath(
+              dialogTitle: 'Select folder',
+            );
+            if (customPath != null && context.mounted) {
+              await _saveMediaToFolder(context, files, customPath);
+            }
           },
-          child: const Text('Save to gallery'),
+          child: const Text('Choose folder'),
         ),
         TextButton(
           onPressed: () async {
             Navigator.of(ctx).pop();
-            await _saveToFolder(context, files);
+            await _saveMediaToFolder(context, files, defaultFolder);
           },
-          child: const Text('Save to folder'),
+          child: const Text('Save to default'),
         ),
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(),
@@ -158,39 +168,12 @@ Future<void> _saveToGallery(
         if (await tmp.exists()) await tmp.delete();
       } catch (_) {}
     }
+    if (!context.mounted) return;
     showToast(context, 'Saved ${files.length} file(s) to gallery');
   } catch (e) {
     logger.error('Saving to gallery failed: $e');
+    if (!context.mounted) return;
     showToast(context, 'Failed to save to gallery: $e');
-  }
-}
-
-Future<void> _saveToFolder(
-  BuildContext context,
-  List<UploadedFile> files,
-) async {
-  try {
-    final targetDir = await FilePicker.platform.getDirectoryPath();
-    if (targetDir == null) {
-      showToast(context, 'Folder selection cancelled');
-      return;
-    }
-
-    for (final f in files) {
-      final src = f.path;
-      final filename = f.filename;
-      final dest = File('$targetDir${Platform.pathSeparator}$filename');
-      await File(src).copy(dest.path);
-      try {
-        final tmp = File(src);
-        if (await tmp.exists()) await tmp.delete();
-      } catch (_) {}
-    }
-
-    showToast(context, 'Saved ${files.length} file(s) to $targetDir');
-  } catch (e) {
-    logger.error('Saving to folder failed: $e');
-    showToast(context, 'Failed to save to folder: $e');
   }
 }
 
@@ -198,8 +181,6 @@ Future<void> showMediaUploadDialog(
   BuildContext context,
   List<UploadedFile> files,
 ) async {
-  if (!context.mounted) return;
-
   final settings = await UploadSettings.init();
 
   bool hasGalleryAccess = false;
@@ -210,8 +191,6 @@ Future<void> showMediaUploadDialog(
   }
 
   final folderDestination = await settings.getFilesDestinationWithDefault();
-
-  if (!context.mounted) return;
 
   final fileNames = files.map((f) => f.filename);
 
@@ -314,9 +293,11 @@ Future<void> _saveMediaToFolder(
         if (await tmp.exists()) await tmp.delete();
       } catch (_) {}
     }
+    if (!context.mounted) return;
     showToast(context, 'Saved ${files.length} file(s) to $targetDir');
   } catch (e) {
     logger.error('Saving to folder failed: $e');
+    if (!context.mounted) return;
     showToast(context, 'Failed to save to folder: $e');
   }
 }

@@ -64,9 +64,11 @@ class _UploadSettingsWidgetState extends State<UploadSettingsWidget> {
         );
         await _settings?.setSaveMediaToGallery(_autoSaveGallery);
         await _settings?.setAlwaysAskSaveLocation(_alwaysAskSaveLocation);
+        if (!mounted) return;
         showToast(context, 'Settings saved successfully');
       } catch (e) {
         logger.error('Failed to save settings: $e');
+        if (!mounted) return;
         showToast(context, 'Failed to save settings');
       }
     }
