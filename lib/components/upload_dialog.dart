@@ -18,16 +18,79 @@ Future<void> showUploadDialog(
   if (!context.mounted) return;
 
   final settings = await UploadSettings.init();
-  final defaultTarget = settings.defaultTarget;
-  final defaultFolder = settings.defaultFolder;
+  final alwaysAsk = settings.alwaysAskSaveLocation;
+  final filesDest = settings.filesDestination;
 
-  final showDestination = destination ?? defaultTarget;
-  logger.debug(
-    "Upload settings defaultFolder $defaultFolder - defaultTarget $defaultTarget - destination $destination - showDestination $showDestination",
-  );
+  final shouldAlwaysAsk =
+      alwaysAsk || filesDest == UploadSettings.askEveryTimePath;
 
-  final showFolder = folder ?? defaultFolder;
+  if (!shouldAlwaysAsk) {
+    final fileNames = files.map((f) => f.filename);
 
+    await NotificationService.showNewMediaReceived(fileNames)
+        .then((_) {
+          logger.info('Notification shown for uploaded files');
+        })
+        .catchError((e) {
+          logger.error('Failed to show notification', error: e);
+        });
+
+    if (!context.mounted) return;
+
+    final showFolder = folder ?? filesDest;
+    final destinationText =
+        'Files${showFolder.isNotEmpty ? '/$showFolder' : ''}';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New upload received'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Files: ${fileNames.join(', ')}'),
+            const SizedBox(height: 8),
+            Text(
+              'Saved to: $destinationText',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _saveToGallery(context, files);
+            },
+            child: const Text('Save to gallery'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _saveToFolder(context, files);
+            },
+            child: const Text('Save to folder'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  } else {
+    await _showSaveOptionsDialog(context, files);
+  }
+}
+
+Future<void> _showSaveOptionsDialog(
+  BuildContext context,
+  List<UploadedFile> files,
+) async {
   final fileNames = files.map((f) => f.filename);
 
   await NotificationService.showNewMediaReceived(fileNames)
@@ -40,28 +103,14 @@ Future<void> showUploadDialog(
 
   if (!context.mounted) return;
 
-  final destinationText = showDestination == UploadDestination.gallery
-      ? 'Gallery'
-      : 'Files${showFolder != null ? '/$showFolder' : ''}';
-
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('New upload received'),
+      title: const Text('Where would you like to save?'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Files: ${fileNames.join(', ')}'),
-          const SizedBox(height: 8),
-          Text(
-            'Saved to: $destinationText',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+        children: [Text('Files: ${fileNames.join(', ')}')],
       ),
       actions: [
         TextButton(
@@ -80,7 +129,7 @@ Future<void> showUploadDialog(
         ),
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Close'),
+          child: const Text('Cancel'),
         ),
       ],
     ),
@@ -138,6 +187,133 @@ Future<void> _saveToFolder(
       } catch (_) {}
     }
 
+    showToast(context, 'Saved ${files.length} file(s) to $targetDir');
+  } catch (e) {
+    logger.error('Saving to folder failed: $e');
+    showToast(context, 'Failed to save to folder: $e');
+  }
+}
+
+Future<void> showMediaUploadDialog(
+  BuildContext context,
+  List<UploadedFile> files,
+) async {
+  if (!context.mounted) return;
+
+  final settings = await UploadSettings.init();
+
+  bool hasGalleryAccess = false;
+  try {
+    hasGalleryAccess = await Gal.hasAccess(toAlbum: false);
+  } catch (e) {
+    logger.debug('Gallery access check failed (platform not supported): $e');
+  }
+
+  final folderDestination = await settings.getFilesDestinationWithDefault();
+
+  if (!context.mounted) return;
+
+  final fileNames = files.map((f) => f.filename);
+
+  await NotificationService.showNewMediaReceived(fileNames)
+      .then((_) {
+        logger.info('Notification shown for uploaded files');
+      })
+      .catchError((e) {
+        logger.error('Failed to show notification', error: e);
+      });
+
+  if (!context.mounted) return;
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('New media received'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Files: ${fileNames.join(', ')}'),
+          const SizedBox(height: 8),
+          if (hasGalleryAccess)
+            Text(
+              'Save to gallery or folder?',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            )
+          else
+            Text(
+              'Saved to: $folderDestination',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        if (hasGalleryAccess) ...[
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _saveToGallery(context, files);
+            },
+            child: const Text('Save to gallery'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final customPath = await FilePicker.platform.getDirectoryPath(
+                dialogTitle: 'Select folder',
+              );
+              if (customPath != null && context.mounted) {
+                await _saveMediaToFolder(context, files, customPath);
+              }
+            },
+            child: const Text('Save to folder'),
+          ),
+        ] else ...[
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final customPath = await FilePicker.platform.getDirectoryPath(
+                dialogTitle: 'Select folder',
+              );
+              if (customPath != null && context.mounted) {
+                await _saveMediaToFolder(context, files, customPath);
+              }
+            },
+            child: const Text('Save to folder'),
+          ),
+        ],
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _saveMediaToFolder(
+  BuildContext context,
+  List<UploadedFile> files,
+  String folderDestination,
+) async {
+  try {
+    final targetDir = folderDestination;
+    for (final f in files) {
+      final src = f.path;
+      final filename = f.filename;
+      final dest = File('$targetDir${Platform.pathSeparator}$filename');
+      await File(src).copy(dest.path);
+      try {
+        final tmp = File(src);
+        if (await tmp.exists()) await tmp.delete();
+      } catch (_) {}
+    }
     showToast(context, 'Saved ${files.length} file(s) to $targetDir');
   } catch (e) {
     logger.error('Saving to folder failed: $e');

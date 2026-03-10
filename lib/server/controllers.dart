@@ -31,7 +31,6 @@ Future<Response> serveTestFile(Request request) async {
 }
 
 Future<Response> serveUpload(Request request) async {
-  final path = await _localPath;
   final settings = UploadSettings.instance;
 
   try {
@@ -43,36 +42,31 @@ Future<Response> serveUpload(Request request) async {
     final files = saved.map((m) => UploadedFile.fromMap(m)).toList();
     final hasMedia = files.any((f) => _isImageOrVideo(f.mime));
 
+    final saveDir = await settings.getFilesDestinationWithDefault();
+    final alwaysAsk = settings.alwaysAskSaveLocation;
+
+    logger.debug("saveDir $saveDir - alwaysAsk $alwaysAsk");
+
     if (hasMedia) {
       final mediaFiles = files.where((f) => _isImageOrVideo(f.mime)).toList();
       final otherFiles = files.where((f) => !_isImageOrVideo(f.mime)).toList();
 
-      final saveToGallery = settings.saveMediaToGallery;
-      final mediaSaveDir = saveToGallery
-          ? '$path/${settings.galleryDestination}'
-          : '$path/${settings.filesDestination}';
-
-      logger.debug(
-        "path $path - mediaSaveDir $mediaSaveDir - saveToGallery $saveToGallery - settings $settings",
-      );
-
-      await _moveFiles(mediaFiles, mediaSaveDir);
-
-      if (saveToGallery) {
+      await _moveFiles(mediaFiles, saveDir);
+      if (alwaysAsk) {
         LocalServer.current?.notifyEvent(UploadMediaEvent(mediaFiles));
-      } else {
-        LocalServer.current?.notifyEvent(UploadFilesEvent(mediaFiles));
       }
 
       if (otherFiles.isNotEmpty) {
-        final saveDir = '$path/${settings.filesDestination}';
         await _moveFiles(otherFiles, saveDir);
-        LocalServer.current?.notifyEvent(UploadFilesEvent(otherFiles));
+        if (alwaysAsk) {
+          LocalServer.current?.notifyEvent(UploadFilesEvent(otherFiles));
+        }
       }
     } else {
-      final saveDir = '$path/${settings.filesDestination}';
       await _moveFiles(files, saveDir);
-      LocalServer.current?.notifyEvent(UploadFilesEvent(files));
+      if (alwaysAsk) {
+        LocalServer.current?.notifyEvent(UploadFilesEvent(files));
+      }
     }
 
     return Response.ok('Uploaded ${saved.length} file(s)');

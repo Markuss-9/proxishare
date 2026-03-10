@@ -1,13 +1,12 @@
+import 'package:path_provider/path_provider.dart';
 import 'package:proxishare/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:proxishare/server/events.dart';
 
 class UploadSettings {
-  static const _targetKey = 'upload_default_target';
-  static const _folderKey = 'upload_default_folder';
   static const _autoAskMediaKey = 'upload_auto_ask_media';
-  static const _galleryDestKey = 'upload_gallery_destination';
   static const _filesDestKey = 'upload_files_destination';
+  static const _alwaysAskSaveLocationKey = 'upload_always_ask_save_location';
+  static const String askEveryTimePath = 'ciao';
 
   static UploadSettings? _instance;
 
@@ -29,6 +28,19 @@ class UploadSettings {
     return _instance!;
   }
 
+  static Future<String> getDefaultFilesDestination() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return '${dir.path}/ProxiShare';
+  }
+
+  Future<String> getFilesDestinationWithDefault() async {
+    final saved = filesDestination;
+    if (saved.isEmpty || saved == askEveryTimePath) {
+      return getDefaultFilesDestination();
+    }
+    return saved;
+  }
+
   bool get saveMediaToGallery {
     return _prefs.getBool(_autoAskMediaKey) ?? false;
   }
@@ -37,43 +49,21 @@ class UploadSettings {
     await _prefs.setBool(_autoAskMediaKey, value);
   }
 
-  String get galleryDestination {
-    return _prefs.getString(_galleryDestKey) ?? 'ProxiShare';
-  }
-
-  Future<void> setGalleryDestination(String path) async {
-    await _prefs.setString(_galleryDestKey, path);
-  }
-
   String get filesDestination {
-    return _prefs.getString(_filesDestKey) ?? 'ProxiShare/files';
+    final dest = _prefs.getString(_filesDestKey) ?? '';
+    logger.debug("Files destination $dest");
+    return dest;
   }
 
   Future<void> setFilesDestination(String path) async {
     await _prefs.setString(_filesDestKey, path);
   }
 
-  UploadDestination get defaultTarget {
-    final value = _prefs.getString(_targetKey);
-    return value == 'files'
-        ? UploadDestination.files
-        : UploadDestination.gallery;
+  bool get alwaysAskSaveLocation {
+    return _prefs.getBool(_alwaysAskSaveLocationKey) ?? false;
   }
 
-  Future<void> setDefaultTarget(UploadDestination target) async {
-    await _prefs.setString(
-      _targetKey,
-      target == UploadDestination.files ? 'files' : 'gallery',
-    );
-  }
-
-  String? get defaultFolder => _prefs.getString(_folderKey);
-
-  Future<void> setDefaultFolder(String? folder) async {
-    if (folder == null || folder.isEmpty) {
-      await _prefs.remove(_folderKey);
-    } else {
-      await _prefs.setString(_folderKey, folder);
-    }
+  Future<void> setAlwaysAskSaveLocation(bool value) async {
+    await _prefs.setBool(_alwaysAskSaveLocationKey, value);
   }
 }

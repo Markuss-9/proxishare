@@ -33,18 +33,9 @@ class LocalShareAppState extends State<LocalShareApp> {
     logger.info("SERVER EVENT: $event");
     final settings = UploadSettings.instance;
     if (event is UploadMediaEvent) {
-      showUploadDialog(
-        context,
-        event.files,
-        destination: settings.defaultTarget,
-      );
+      showMediaUploadDialog(context, event.files);
     } else if (event is UploadFilesEvent) {
-      showUploadDialog(
-        context,
-        event.files,
-        destination: settings.defaultTarget,
-        folder: settings.defaultFolder,
-      );
+      showUploadDialog(context, event.files, folder: settings.filesDestination);
     } else {
       logger.warn("Unhandled server event: $event");
     }
